@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consejo Local · Panel principal</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+  // Respaldo: si gstatic.com está bloqueado (extensión, antivirus, red), se reintenta con jsDelivr.
+  function cargarScript(src){
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src; s.onload = resolve;
+      s.onerror = () => reject(new Error('No se pudo cargar: ' + src));
+      document.head.appendChild(s);
+    });
+  }
+  async function asegurarFirebaseCargado(){
+    if(typeof firebase !== 'undefined' && firebase.firestore && firebase.auth) return true;
+    try{
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js');
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.js');
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.js');
+      return typeof firebase !== 'undefined' && !!firebase.firestore && !!firebase.auth;
+    }catch(e){ return false; }
+  }
+</script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+  :root{
+    /* Paleta idéntica a Minutas y Calendarizador */
+    --navy:#1a2744; --navy-mid:#243260; --navy-light:#2e3f7a;
+    --gold:#c9a84c; --gold-light:#e2c67a; --gold-pale:#fdf6e3;
+    --cream:#f8f6f0; --white:#ffffff;
+    --gray-100:#f3f4f6; --gray-200:#e5e7eb; --gray-400:#9ca3af; --gray-600:#4b5563; --gray-800:#1f2937;
+    --danger:#dc2626; --success:#16a34a;
+    --shadow-sm:0 1px 3px rgba(0,0,0,.1); --shadow-md:0 4px 12px rgba(0,0,0,.12); --shadow-lg:0 8px 24px rgba(0,0,0,.15);
+    --radius:8px; --radius-lg:12px;
+
+    /* Estados del caso: rojo = en suspensión, verde = habilitado */
+    --susp:#991b1b; --susp-bg:#fee2e2; --susp-soft:#fffafa;
+    --hab:#166534;  --hab-bg:#dcfce7;  --hab-soft:#f6fcf8;
+    --amber:#9a3412; --amber-bg:#ffedd5;
+    --info:#1e40af; --info-bg:#dbeafe;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--cream);color:var(--gray-800);font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh;}
+  h1,h2,h3,.serif{font-family:'Playfair Display',serif;}
+  .muted{color:var(--gray-400);}
+  ::selection{background:var(--gold-light);color:var(--navy);}
+  ::-webkit-scrollbar{width:6px;height:6px;} ::-webkit-scrollbar-track{background:var(--gray-100);} ::-webkit-scrollbar-thumb{background:var(--gray-400);border-radius:3px;}
+  button:focus-visible,[tabindex]:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important;}}
+
+  .wrap{max-width:1100px;margin:0 auto;padding:20px;}
+
+  /* Header */
+  header.app-header{position:sticky;top:0;z-index:40;background:linear-gradient(135deg,var(--navy) 0%,var(--navy-mid) 60%,var(--navy-light) 100%);box-shadow:var(--shadow-lg);}
+  .hdr{max-width:1100px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  .hdr h1{margin:0;font-size:1rem;font-weight:600;color:#fff;}
+  .hdr p{margin:2px 0 0;font-size:.72rem;color:var(--gold-light);text-transform:uppercase;letter-spacing:.04em;}
+  .hdr .acciones{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .modnav{display:flex;gap:4px;margin-right:6px;}
+  .modnav a,.modnav span{font-size:.78rem;font-weight:600;padding:6px 12px;border-radius:6px;color:var(--gold-light);text-decoration:none;}
+  .modnav a:hover{background:rgba(201,168,76,.2);}
+  .modnav .actual{background:var(--gold);color:var(--navy);}
+  .modnav .pronto{opacity:.45;cursor:default;}
+  .btn-header{background:rgba(201,168,76,.2);border:1px solid rgba(201,168,76,.4);color:var(--gold-light);padding:7px 14px;border-radius:var(--radius);font-size:.8rem;font-weight:500;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:6px;}
+  .btn-header:hover{background:var(--gold);color:var(--navy);}
+
+  .date-tile{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;min-width:58px;height:58px;border-radius:var(--radius);flex-shrink:0;background:var(--navy);padding:6px 10px;}
+  .date-tile .day{font-weight:700;font-size:1.35rem;line-height:1;color:#fff;}
+  .date-tile .mon{font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;margin-top:3px;color:var(--gold-light);white-space:nowrap;}
+  .date-tile.on-navy{background:var(--gold);box-shadow:0 2px 8px rgba(201,168,76,.4);}
+  .date-tile.on-navy .day{color:var(--navy);} .date-tile.on-navy .mon{color:var(--navy-mid);}
+
+  /* Controles */
+  .card{background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);}
+  .input,select.input,textarea.input{width:100%;background:var(--white);border:1.5px solid var(--gray-200);border-radius:var(--radius);padding:9px 12px;font-family:'Inter',sans-serif;font-size:14px;color:var(--gray-800);outline:none;transition:border-color .2s,box-shadow .2s;}
+  .input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,.15);}
+  textarea.input{resize:vertical;min-height:90px;line-height:1.5;}
+  label.f-label{font-size:.76rem;font-weight:600;letter-spacing:.03em;color:var(--navy);display:block;margin-bottom:5px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;justify-content:center;border-radius:var(--radius);font-weight:500;font-size:13.5px;padding:9px 16px;cursor:pointer;border:none;transition:all .2s;user-select:none;font-family:inherit;}
+  .btn-primary{background:var(--navy);color:#fff;} .btn-primary:hover{background:var(--navy-light);}
+  .btn-ghost{background:transparent;color:var(--gray-600);border:1.5px solid var(--gray-200);} .btn-ghost:hover{border-color:var(--navy);color:var(--navy);}
+  .btn-gold{background:var(--gold);color:var(--navy);font-weight:600;} .btn-gold:hover{background:var(--gold-light);}
+  .btn-danger{background:var(--danger);color:#fff;} .btn-danger:hover{background:#b91c1c;}
+  .btn-ok{background:var(--hab);color:#fff;} .btn-ok:hover{background:#14532d;}
+  .btn-sm{padding:5px 10px;font-size:12px;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .link{background:none;border:none;color:var(--navy-light);font-size:12px;font-weight:600;cursor:pointer;padding:2px 4px;font-family:inherit;}
+  .link:hover{text-decoration:underline;} .link.del{color:var(--susp);}
+
+  .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap;}
+  .badge-susp{background:var(--susp-bg);color:var(--susp);} .badge-hab{background:var(--hab-bg);color:var(--hab);}
+  .nota-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--navy);border:1px solid var(--gold);padding:1px 8px;border-radius:999px;background:var(--gold-pale);}
+
+  /* Resumen */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .stat{background:var(--white);border:1.5px solid var(--gray-200);border-radius:var(--radius-lg);padding:12px 16px;cursor:pointer;text-align:left;font-family:inherit;transition:border-color .2s,box-shadow .2s;}
+  .stat:hover{border-color:var(--gold-light);} .stat.active{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,.18);}
+  .stat .n{font-family:'Playfair Display',serif;font-size:1.9rem;font-weight:700;line-height:1.1;color:var(--navy);}
+  .stat .l{font-size:.76rem;color:var(--gray-600);font-weight:600;margin-top:2px;}
+  .stat-susp .n{color:var(--susp);} .stat-hab .n{color:var(--hab);} .stat-aten .n{color:var(--amber);}
+  @media (max-width:720px){.stats{grid-template-columns:repeat(2,1fr);}}
+
+  /* Alertas */
+  .alerta{display:flex;gap:12px;align-items:center;padding:10px 14px;border-radius:10px;border:1px solid;font-size:13.5px;}
+  .alerta + .alerta{margin-top:8px;}
+  .alerta .ico{font-size:1.2rem;flex-shrink:0;}
+  .alerta .txt{flex:1;min-width:0;}
+  .alerta .txt b{display:block;}
+  .alerta-vencida{background:#fee2e2;border-color:#fca5a5;color:#7f1d1d;}
+  .alerta-proxima{background:#ffedd5;border-color:#fdba74;color:#7c2d12;}
+  .alerta-indef{background:#fef3c7;border-color:#fcd34d;color:#78350f;}
+  .alerta .btn{flex-shrink:0;background:rgba(255,255,255,.7);color:inherit;border:1px solid currentColor;}
+
+  /* Lista de casos */
+  .caso{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;border:1px solid var(--gray-200);border-left:6px solid;border-radius:var(--radius-lg);cursor:pointer;transition:box-shadow .2s;}
+  .caso + .caso{margin-top:10px;}
+  .caso:hover{box-shadow:var(--shadow-md);}
+  .caso-susp{border-left-color:var(--susp);background:var(--susp-soft);}
+  .caso-hab{border-left-color:var(--hab);background:var(--hab-soft);}
+  .caso .date-tile{background:var(--navy);}
+  .caso-main{flex:1;min-width:0;}
+  .caso-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .caso-nombre{font-size:1.1rem;font-weight:700;color:var(--navy);}
+  .caso-linea{font-size:.84rem;color:var(--gray-600);margin-top:3px;}
+  .caso-linea b{color:var(--gray-800);font-weight:600;}
+  .chip-alerta{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;}
+  .chip-vencida{background:var(--danger);color:#fff;} .chip-proxima{background:var(--amber-bg);color:var(--amber);border:1px solid #fdba74;} .chip-indef{background:#fef3c7;color:#78350f;border:1px solid #fcd34d;}
+
+  /* Detalle */
+  .banda{padding:10px 20px;font-size:.82rem;font-weight:700;letter-spacing:.02em;border-radius:var(--radius-lg) var(--radius-lg) 0 0;}
+  .banda-susp{background:var(--susp);color:#fff;} .banda-hab{background:var(--hab);color:#fff;}
+  .datos{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 20px;}
+  .datos .k{font-size:.72rem;font-weight:600;color:var(--gray-400);letter-spacing:.03em;}
+  .datos .v{font-size:.95rem;font-weight:600;color:var(--navy);margin-top:2px;}
+  @media (max-width:720px){.datos{grid-template-columns:repeat(2,1fr);}}
+
+  /* Historial (desarrollo del caso) */
+  .tl{position:relative;margin:6px 0 0 8px;padding-left:22px;border-left:2px solid var(--gold-light);}
+  .tl-item{position:relative;padding-bottom:16px;}
+  .tl-dot{position:absolute;left:-30px;top:5px;width:14px;height:14px;border-radius:50%;border:3px solid var(--white);background:var(--navy);box-shadow:0 0 0 1.5px var(--gold-light);}
+  .tl-card{background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:12px 14px;}
+  .tl-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;}
+  .tl-fecha{font-weight:700;font-size:.85rem;color:var(--navy);}
+  .tl-ed{font-size:11px;color:var(--gray-400);font-style:italic;}
+  .tl-acc{margin-left:auto;display:flex;gap:2px;}
+  .tl-texto{font-size:.92rem;line-height:1.6;color:var(--gray-800);overflow-wrap:anywhere;}
+  .tp-inicio{background:var(--navy);color:#fff;} .tp-habilitacion{background:var(--hab-bg);color:var(--hab);} .tp-reapertura{background:var(--susp-bg);color:var(--susp);}
+  .tp-extension{background:var(--amber-bg);color:var(--amber);} .tp-revision{background:var(--info-bg);color:var(--info);}
+  .tp-actualizacion,.tp-reunion,.tp-decision{background:var(--gray-100);color:var(--gray-600);}
+  .tl-dot.tp-habilitacion{background:var(--hab);} .tl-dot.tp-reapertura{background:var(--susp);} .tl-dot.tp-extension{background:var(--amber);} .tl-dot.tp-revision{background:var(--info);}
+  .tl-dot.tp-actualizacion,.tl-dot.tp-reunion,.tl-dot.tp-decision{background:var(--gray-400);}
+  .nuevo-mov{background:var(--gold-pale);border:1px dashed var(--gold);border-radius:var(--radius-lg);padding:14px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;} .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+  @media (max-width:620px){.grid2,.grid3{grid-template-columns:1fr;}}
+
+  .divider-orn{display:flex;align-items:center;gap:10px;color:var(--gold);margin:18px 0 12px;}
+  .divider-orn::before{content:'';width:10px;height:1px;background:var(--gold);}
+  .divider-orn::after{content:'';flex:1;height:1px;background:linear-gradient(to right,var(--gold),transparent);}
+
+  /* Modales */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:60;padding:16px;}
+  .modal-box{background:var(--white);border-radius:var(--radius-lg);max-width:620px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);border-top:3px solid var(--gold);padding:22px;}
+  .modal-box h3{margin:0 0 14px;font-size:1.15rem;color:var(--navy);}
+  .campo{margin-bottom:12px;}
+  .error-form{color:var(--susp);font-size:.84rem;margin:6px 0 0;display:none;}
+  .tab-mini{font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:6px;cursor:pointer;color:var(--gray-400);}
+  .tab-mini.active{background:var(--navy);color:#fff;}
+  .fila-persona{display:flex;align-items:center;gap:10px;padding:6px 8px;border-bottom:1px solid var(--gray-100);font-size:.9rem;}
+  .fila-persona .cnt{margin-left:auto;font-size:11px;background:var(--gray-100);padding:1px 8px;border-radius:999px;color:var(--gray-600);}
+
+  .toast{position:fixed;bottom:18px;right:18px;z-index:80;background:var(--success);color:#fff;padding:12px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;box-shadow:var(--shadow-lg);}
+  .toast.err{background:var(--danger);}
+  #banner-error{display:none;margin-bottom:14px;padding:12px 16px;border-radius:10px;background:#fee2e2;border:1px solid #fca5a5;color:#7f1d1d;font-size:.88rem;line-height:1.5;}
+
+  .print-only{display:none;}
+  @page{margin:16mm;}
+  @media print{
+    body{background:#fff;}
+    .no-print{display:none !important;}
+    .print-only{display:block;}
+    .card{box-shadow:none !important;}
+    .tl-card{break-inside:avoid;}
+    .banda{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .badge,.nota-tag{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  }
+
+  a.btn{text-decoration:none;}
+  .mod-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;}
+  @media (max-width:720px){.mod-grid{grid-template-columns:1fr;}}
+  .mod-card{display:block;text-decoration:none;color:inherit;padding:18px 20px;background:#fff;border:1px solid var(--gray-200);border-top:4px solid var(--gold);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);transition:box-shadow .2s,transform .2s;}
+  .mod-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);}
+  .mod-top{display:flex;gap:14px;align-items:center;}
+  .mod-ico{font-size:1.8rem;width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:var(--navy);border-radius:var(--radius);flex-shrink:0;}
+  .mod-t{font-size:1.2rem;font-weight:700;color:var(--navy);} .mod-d{font-size:.84rem;color:var(--gray-600);margin-top:2px;}
+  .mod-nums{display:flex;gap:22px;margin-top:14px;flex-wrap:wrap;}
+  .mod-num .n{font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;color:var(--navy);line-height:1.1;}
+  .mod-num .n.rojo{color:var(--danger);} .mod-num .n.ambar{color:var(--amber);}
+  .mod-num .l{font-size:.72rem;color:var(--gray-600);font-weight:600;}
+  .mod-go{margin-top:12px;font-size:.82rem;font-weight:600;color:var(--navy-light);}
+  .mod-card.futuro{border-top-color:var(--gray-400);background:var(--gray-100);}
+  .panel-t{display:flex;align-items:center;gap:10px;margin:26px 0 10px;} .panel-t h2{margin:0;font-size:1.15rem;color:var(--navy);}
+  .ok-box{padding:14px 16px;border-radius:10px;background:var(--hab-bg);color:var(--hab);font-size:.9rem;font-weight:600;}
+  .res-persona{padding:12px 14px;border:1px solid var(--gray-200);border-radius:var(--radius);background:#fff;} .res-persona + .res-persona{margin-top:8px;}
+  .fm-nombre{font-weight:700;color:var(--navy);} .fm-sub{font-size:.82rem;color:var(--gray-600);margin-top:4px;} .fm-sub a{color:var(--navy-light);font-weight:600;}
+</style>
+</head>
+<body>
+
+<!-- Pantalla de error de carga -->
+<div id="setup-screen" style="display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px;">
+  <div class="card" style="max-width:560px;padding:26px;">
+    <h1 class="serif" style="margin:0 0 8px;font-size:1.3rem;color:var(--navy);">No se pudo conectar</h1>
+    <p id="setup-error" style="font-size:.9rem;line-height:1.6;color:var(--susp);margin:0;"></p>
+  </div>
+</div>
+
+<!-- Inicio de sesión -->
+<div id="login-screen" style="display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px;">
+  <div class="card" style="max-width:400px;width:100%;padding:28px;border-top:3px solid var(--gold);">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <div class="date-tile on-navy"><span class="day">🔒</span><span class="mon">Acceso</span></div>
+      <div><h1 class="serif" style="margin:0;font-size:1.2rem;color:var(--navy);">Sistema del Consejo Local</h1>
+      <p class="muted" style="margin:2px 0 0;font-size:.82rem;">Solo para miembros autorizados del Consejo Local</p></div>
+    </div>
+    <p id="login-aviso" style="font-size:.85rem;color:var(--amber);margin:0 0 10px;"></p>
+    <div class="campo"><label class="f-label" for="lg-correo">Correo</label><input type="email" class="input" id="lg-correo" autocomplete="username" onkeydown="if(event.key==='Enter')iniciarSesion()"></div>
+    <div class="campo"><label class="f-label" for="lg-clave">Contraseña</label><input type="password" class="input" id="lg-clave" autocomplete="current-password" onkeydown="if(event.key==='Enter')iniciarSesion()"></div>
+    <p class="error-form" id="lg-error"></p>
+    <button class="btn btn-primary" style="width:100%;margin-top:6px;" id="lg-btn" onclick="iniciarSesion()">Entrar</button>
+    <p style="text-align:center;margin:12px 0 0;"><button class="link" onclick="recuperarClave()">Olvidé mi contraseña</button></p>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <header class="app-header no-print">
+    <div class="hdr">
+      <div class="date-tile on-navy"><span class="day" id="top-dia">—</span><span class="mon" id="top-mes">· · ·</span></div>
+      <div>
+        <h1 class="serif">Iglesia Evangélica Centroamericana "Salem"</h1>
+        <p>Sistema del Consejo Local — Patzún, Chimaltenango</p>
+      </div>
+      <div class="acciones">
+        <span id="usuario-email" style="font-size:.74rem;color:rgba(255,255,255,.65);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+        <button class="btn-header" onclick="cerrarSesion()">Salir</button>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <div id="banner-error" role="alert"></div>
+    <h2 class="serif" id="saludo" style="margin:4px 0 2px;font-size:1.6rem;color:var(--navy);"></h2>
+    <p class="muted" id="fecha-larga" style="margin:0 0 18px;font-size:.9rem;"></p>
+    <div class="mod-grid" id="modulos"></div>
+    <div class="panel-t"><h2 class="serif">Requieren atención</h2></div>
+    <div id="atencion"></div>
+    <div id="cruces"></div>
+    <div class="panel-t"><h2 class="serif">Buscar una persona</h2></div>
+    <input type="search" id="busq-persona" class="input" placeholder="Escribe un nombre para ver sus cargos y su situación en todos los módulos…" oninput="renderBusqueda()">
+    <div id="res-busqueda" style="margin-top:10px;"></div>
+  </main>
+</div>
+<div id="toast-root"></div>
+
+<script>
+// ---------- Conexión (mismo proyecto y misma llave de configuración que Minutas) ----------
+const EMBEDDED_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAPeBr8Rw8Hw5OS0QFIBLdpgFeqaUuzzqs",
+  authDomain: "salem-minutas.firebaseapp.com",
+  projectId: "salem-minutas",
+  storageBucket: "salem-minutas.firebasestorage.app",
+  messagingSenderId: "509496830084",
+  appId: "1:509496830084:web:8865b4265d0065a3333ad1"
+};
+let db = null, auth = null, firebaseConfig = null, usuario = null;
+let unsubs = [], timerConexion = null, inactTimer = null;
+const LIMITE_INACTIVIDAD = 30*60*1000; // 30 minutos
+
+function cargarConfigGuardada(){
+  const raw = localStorage.getItem('minutas_firebase_config');
+  if(!raw) return null;
+  try{ return JSON.parse(raw); }catch(e){ return null; }
+}
+function inicializarFirebase(config){
+  firebase.initializeApp(config);
+  db = firebase.firestore();
+  auth = firebase.auth();
+  // Algunas redes, antivirus o bloqueadores cortan el streaming (WebChannel) de Firestore.
+  // Se fuerza long-polling, que es más lento pero compatible en esos casos.
+  try{ db.settings({ experimentalForceLongPolling:true, useFetchStreams:false, merge:true }); }catch(e){}
+  firebaseConfig = config;
+}
+function olvidarConfiguracion(){
+  if(!confirm('Esto borrará la configuración guardada en este navegador. ¿Continuar?')) return;
+  localStorage.removeItem('minutas_firebase_config');
+  location.reload();
+}
+
+// ---------- Utilidades de texto y fechas ----------
+const q = id => document.getElementById(id);
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function br(s){ return esc(s).replace(/\n/g,'<br>'); }
+function norm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim(); }
+function uid(){ return 'h' + Math.random().toString(36).slice(2,9) + Date.now().toString(36); }
+function pl(n, uno, otros){ return n + ' ' + (n===1 ? uno : otros); }
+
+// Fechas siempre en hora local (evita el desfase de UTC en las tardes de Guatemala)
+function fISO(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function hoyISO(){ return fISO(new Date()); }
+function parseISO(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+function sumarDias(iso, n){ const d = parseISO(iso); d.setDate(d.getDate()+n); return fISO(d); }
+function sumarMeses(iso, n){
+  const d = parseISO(iso), dia = d.getDate();
+  d.setDate(1); d.setMonth(d.getMonth()+n);
+  const ult = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  d.setDate(Math.min(dia, ult));
+  return fISO(d);
+}
+function diffDias(a, b){ return Math.round((parseISO(b) - parseISO(a)) / 86400000); } // b - a
+function mesesTranscurridos(desde, hasta){
+  const a = parseISO(desde), b = parseISO(hasta);
+  let m = (b.getFullYear()-a.getFullYear())*12 + (b.getMonth()-a.getMonth());
+  if(b.getDate() < a.getDate()) m--;
+  return Math.max(0, m);
+}
+function fmtFecha(iso){ if(!iso) return '—'; const d = parseISO(iso); return d.getDate() + ' ' + MESES[d.getMonth()] + ' ' + d.getFullYear(); }
+function calcFin(inicio, n, unidad){
+  if(unidad==='dias') return sumarDias(inicio, n);
+  if(unidad==='semanas') return sumarDias(inicio, n*7);
+  if(unidad==='anios') return sumarMeses(inicio, n*12);
+  return sumarMeses(inicio, n);
+}
+const UNIDADES = { dias:['día','días'], semanas:['semana','semanas'], meses:['mes','meses'], anios:['año','años'] };
+
+function toast(msg, error){
+  const t = document.createElement('div');
+  t.className = 'toast' + (error ? ' err' : ''); t.textContent = msg;
+  q('toast-root').appendChild(t); setTimeout(() => t.remove(), 2600);
+}
+function abrirModal(id){ q(id).style.display = 'flex'; }
+function cerrarModal(id){ q(id).style.display = 'none'; }
+
+
+// ---------- Módulos (para agregar otro sistema, basta con añadir un objeto aquí) ----------
+const MODULOS = [
+  { id:'minutas',    ico:'📜', titulo:'Minutas',    desc:'Sesiones, acuerdos y seguimiento del Consejo.', href:'MinutasConsejoLocal.html',     nums:() => numsMinutas() },
+  { id:'disciplina', ico:'⚖️', titulo:'Disciplina', desc:'Casos de suspensión y habilitación de privilegios.', href:'DisciplinaConsejoLocal.html',  nums:() => numsDisciplina() },
+  { id:'ministerios',ico:'🙏', titulo:'Ministerios y grupos', desc:'Directivas, integrantes e historial de cada grupo.', href:'MinisteriosConsejoLocal.html', nums:() => numsMinisterios() },
+  { id:'calendario', ico:'📅', titulo:'Calendario de actividades', desc:'Sistema independiente; se conectará en una próxima etapa.', href:'https://joseap35.github.io/calendario-salem/', futuro:true, nums:() => [] }
+];
+const DIAS_AVISO = 30;
+let disc = [], mins = [], ses = [], personas = [], cargado = {};
+
+function autorActual(){ return usuario && usuario.email ? usuario.email : ''; }
+function detenerApp(){
+  unsubs.forEach(u => { try{ u(); }catch(e){} }); unsubs = []; clearTimeout(timerConexion);
+  disc = []; mins = []; ses = []; personas = []; cargado = {};
+}
+function iniciarApp(){
+  detenerApp();
+  const h = new Date();
+  q('top-dia').textContent = h.getDate(); q('top-mes').textContent = MESES[h.getMonth()] + ' ' + h.getFullYear();
+  const hr = h.getHours();
+  q('saludo').textContent = (hr<12 ? 'Buenos días' : hr<19 ? 'Buenas tardes' : 'Buenas noches') + (usuario && usuario.email ? ', ' + usuario.email.split('@')[0] : '');
+  q('fecha-larga').textContent = h.toLocaleDateString('es-GT', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  const sub = (nombre, destino) => unsubs.push(db.collection(nombre).onSnapshot(snap => {
+    destino(snap.docs.map(d => ({ id:d.id, ...d.data() }))); cargado[nombre] = true; q('banner-error').style.display = 'none'; render();
+  }, errorFirestore));
+  sub('disciplina', r => { disc = r; });
+  sub('ministerios', r => { mins = r; });
+  sub('personas', r => { personas = r; });
+  unsubs.push(db.collection('sesiones').orderBy('fecha','desc').limit(80).onSnapshot(snap => {
+    ses = snap.docs.map(d => ({ id:d.id, ...d.data() })); cargado.sesiones = true; render();
+  }, e => { console.warn('Sesiones no disponible:', e); cargado.sesiones = 'error'; render(); }));
+  timerConexion = setTimeout(() => {
+    if(cargado.disciplina || cargado.ministerios) return;
+    const b = q('banner-error');
+    b.innerHTML = '<b>No se logra conectar con Firestore.</b> Revisa tu conexión, que ningún bloqueador bloquee <b>firestore.googleapis.com</b> y que las reglas incluyan las colecciones <b>disciplina</b>, <b>ministerios</b> y <b>personas</b>.';
+    b.style.display = 'block';
+  }, 10000);
+}
+
+// ---------- Lógica de alertas (misma que en Disciplina y Ministerios) ----------
+function ultimaRevision(c){
+  const hoy = hoyISO();
+  const fechas = (c.historial||[]).filter(h => h.tipo==='revision' && h.fecha && h.fecha <= hoy).map(h => h.fecha).sort();
+  return fechas.length ? fechas[fechas.length-1] : null;
+}
+function alertaCaso(c){
+  if(c.estado !== 'suspendido') return null;
+  const hoy = hoyISO();
+  if(c.fechaFin){
+    const d = diffDias(hoy, c.fechaFin);
+    if(d < 0) return { nivel:'vencida', orden:0, dias:d, chip:'Plazo vencido', texto:'La fecha final venció hace ' + pl(-d,'día','días') + ' y el caso sigue sin resolución.' };
+    if(d <= 15) return { nivel:'proxima', orden:1, dias:d, chip:d===0?'Termina hoy':'Faltan ' + pl(d,'día','días'),
+      texto: d===0 ? 'La suspensión termina hoy.' : 'La suspensión termina en ' + pl(d,'día','días') + ' (' + fmtFecha(c.fechaFin) + ').' };
+    return null;
+  }
+  const rev = ultimaRevision(c);
+  const base = rev || c.fechaInicio;
+  if(!base || hoy < sumarMeses(base, 3)) return null;
+  const m = mesesTranscurridos(c.fechaInicio, hoy);
+  return { nivel:'indef', orden:2, dias:-diffDias(c.fechaInicio, hoy), chip:'Sin resolución · ' + pl(m,'mes','meses'),
+    texto:'Suspensión indefinida con ' + pl(m,'mes','meses') + ' sin resolución' + (rev ? ' (última revisión: ' + fmtFecha(rev) + ').' : '.') };
+}
+function duracionTexto(c){
+  if(!c.fechaFin) return 'Indefinido';
+  if(c.cantidad && c.unidad){ const u = UNIDADES[c.unidad] || UNIDADES.meses; return c.cantidad + ' ' + (c.cantidad===1 ? u[0] : u[1]); }
+  return pl(diffDias(c.fechaInicio, c.fechaFin), 'día', 'días');
+}
+function lineaTiempo(c){
+  if(c.estado === 'habilitado'){
+    const dias = c.fechaHabilitacion ? diffDias(c.fechaInicio, c.fechaHabilitacion) : null;
+    return 'Habilitado el ' + fmtFecha(c.fechaHabilitacion) + (dias!=null ? ' · suspensión de ' + pl(dias,'día','días') : '');
+  }
+  const hoy = hoyISO();
+  if(c.fechaFin){
+    const d = diffDias(hoy, c.fechaFin);
+    const rest = d>0 ? 'faltan ' + pl(d,'día','días') : d===0 ? 'termina hoy' : 'venció hace ' + pl(-d,'día','días');
+    return 'Hasta el ' + fmtFecha(c.fechaFin) + ' · ' + rest;
+  }
+  return 'Indefinida · ' + pl(mesesTranscurridos(c.fechaInicio, hoy),'mes','meses') + ' desde el inicio';
+}
+
+
+function estadoMiembro(m){ const h = hoyISO(); if(m.hasta && m.hasta < h) return 'fin'; if(m.desde && m.desde > h) return 'futuro'; return 'vigente'; }
+function vigente(m){ return estadoMiembro(m) === 'vigente'; }
+function ordenarMiembros(arr){
+  const o = { vigente:0, futuro:1, fin:2 };
+  return [...arr].sort((a,b) => o[estadoMiembro(a)]-o[estadoMiembro(b)] || a.nombre.localeCompare(b.nombre,'es'));
+}
+function suspensionesDe(personaId, nombre){
+  return disc.filter(c => c.estado==='suspendido' && ((personaId && c.personaId===personaId) || norm(c.nombre)===norm(nombre)));
+}
+function suspendidosDelMinisterio(mi){
+  return disc.filter(c => c.estado==='suspendido' && (c.ministerioId===mi.id || norm(c.ministerio)===norm(mi.nombre)));
+}
+
+// ---------- Alertas ----------
+// Un ministerio activo avisa si: no tiene a nadie con cargo vigente; el período de un cargo ya venció sin reemplazo;
+// o el período de un cargo termina en DIAS_AVISO días o menos y no hay reemplazo previsto.
+function alertasDe(mi){
+  if(mi.estado !== 'activo') return [];
+  const hoy = hoyISO(), dir = mi.directiva || [], out = [];
+  if(!dir.some(vigente)) out.push({ nivel:'vencida', orden:0, dias:-99999, chip:'Sin directiva vigente', texto:'No hay nadie con un cargo vigente en la directiva.' });
+  const grupos = {};
+  dir.forEach(m => { const k = norm(m.rol); (grupos[k] = grupos[k] || []).push(m); });
+  Object.values(grupos).forEach(g => {
+    const vig = g.filter(vigente), futuro = g.some(o => o.desde && o.desde > hoy);
+    if(!vig.length){
+      if(futuro) return;
+      const ult = [...g].sort((a,b) => (b.hasta||'').localeCompare(a.hasta||''))[0];
+      if(ult.hasta && ult.hasta < hoy){
+        const d = diffDias(hoy, ult.hasta);
+        out.push({ nivel:'vencida', orden:1, dias:d, chip:'Período vencido: ' + ult.rol, texto:'El período de ' + ult.nombre + ' como ' + ult.rol + ' terminó hace ' + pl(-d,'día','días') + ' y no hay reemplazo.' });
+      }
+    }else{
+      vig.forEach(v => {
+        if(!v.hasta) return;
+        const d = diffDias(hoy, v.hasta);
+        if(d <= DIAS_AVISO && !futuro && !vig.some(o => o.id!==v.id && (!o.hasta || o.hasta > v.hasta)))
+          out.push({ nivel:'proxima', orden:2, dias:d, chip:v.rol + ': ' + (d===0 ? 'termina hoy' : pl(d,'día','días')),
+            texto:'El período de ' + v.nombre + ' como ' + v.rol + (d===0 ? ' termina hoy.' : ' termina en ' + pl(d,'día','días') + ' (' + fmtFecha(v.hasta) + ').') });
+      });
+    }
+  });
+  return out.sort((a,b) => a.orden-b.orden || a.dias-b.dias);
+}
+
+// ---------- Datos de cada módulo ----------
+function nm(n, l, cls){ return { n, l, cls:cls||'' }; }
+function numsMinutas(){
+  if(cargado.sesiones==='error') return [nm('—','sin acceso a las sesiones')];
+  const y = String(new Date().getFullYear());
+  return [nm(ses.filter(s => (s.fecha||'').startsWith(y)).length, 'sesiones este año'), nm(ses[0] ? fmtFecha(ses[0].fecha) : '—', 'última sesión'), nm(ses.filter(s => s.estado==='borrador').length, 'en borrador')];
+}
+function numsDisciplina(){
+  const susp = disc.filter(c => c.estado==='suspendido').length, al = disc.filter(c => alertaCaso(c)).length;
+  return [nm(susp, 'en suspensión', susp ? 'rojo' : ''), nm(al, 'con alerta', al ? 'ambar' : ''), nm(disc.filter(c => c.estado==='habilitado').length, 'habilitados')];
+}
+function numsMinisterios(){
+  const al = mins.filter(m => alertasDe(m).length).length;
+  return [nm(mins.filter(m => m.estado==='activo').length, 'activos'), nm(al, 'con alerta', al ? 'ambar' : ''), nm(mins.filter(m => m.estado!=='activo').length, 'inactivos')];
+}
+function todasLasAlertas(){
+  const out = [];
+  disc.forEach(c => { const a = alertaCaso(c); if(a) out.push({ mod:'Disciplina', ico:a.nivel==='vencida'?'⚠️':a.nivel==='proxima'?'⏳':'🕒', nivel:a.nivel, orden:a.orden, dias:a.dias, titulo:c.nombre + ' · ' + c.ministerio, texto:a.texto, href:'DisciplinaConsejoLocal.html#abrir=' + c.id }); });
+  mins.forEach(m => alertasDe(m).forEach(a => out.push({ mod:'Ministerios', ico:a.nivel==='vencida'?'⚠️':'⏳', nivel:a.nivel, orden:a.orden, dias:a.dias, titulo:m.nombre, texto:a.texto, href:'MinisteriosConsejoLocal.html#abrir=' + m.id })));
+  return out.sort((x,y) => x.orden-y.orden || x.dias-y.dias);
+}
+function crucesPersonas(){
+  const out = [];
+  mins.filter(m => m.estado==='activo').forEach(m => (m.directiva||[]).concat(m.integrantes||[]).filter(vigente).forEach(x => {
+    const s = suspensionesDe(x.personaId, x.nombre);
+    if(s.length) out.push({ persona:x.nombre, rol:x.rol, min:m, susp:s });
+  }));
+  return out;
+}
+
+// ---------- Pintado ----------
+function render(){
+  q('modulos').innerHTML = MODULOS.map(m => {
+    const nums = m.nums();
+    return '<a class="mod-card' + (m.futuro?' futuro':'') + '" href="' + m.href + '"><div class="mod-top"><span class="mod-ico">' + m.ico + '</span><div><div class="mod-t serif">' + esc(m.titulo) + '</div><div class="mod-d">' + esc(m.desc) + '</div></div></div>' +
+      (nums.length ? '<div class="mod-nums">' + nums.map(x => '<div class="mod-num"><div class="n ' + x.cls + '">' + esc(x.n) + '</div><div class="l">' + esc(x.l) + '</div></div>').join('') + '</div>' : '') +
+      '<div class="mod-go">' + (m.futuro ? 'Abrir sistema independiente →' : 'Abrir módulo →') + '</div></a>';
+  }).join('');
+  const als = todasLasAlertas();
+  document.title = (als.length ? '(' + als.length + ') ' : '') + 'Consejo Local · Panel principal';
+  const listo = cargado.disciplina && cargado.ministerios;
+  q('atencion').innerHTML = !listo ? '<p class="muted" style="font-size:.9rem;">Cargando…</p>' : als.length
+    ? als.map(a => '<div class="alerta alerta-' + a.nivel + '"><span class="ico">' + a.ico + '</span><div class="txt"><b>' + esc(a.titulo) + ' <span style="font-weight:500;opacity:.75;">(' + a.mod + ')</span></b>' + esc(a.texto) + '</div><a class="btn btn-sm" href="' + a.href + '">Abrir</a></div>').join('')
+    : '<div class="ok-box">✓ Todo en orden: no hay alertas pendientes.</div>';
+  const cr = listo ? crucesPersonas() : [];
+  q('cruces').innerHTML = cr.length
+    ? '<div class="panel-t"><h2 class="serif">Para revisar</h2></div>' + cr.map(c => '<div class="alerta alerta-indef"><span class="ico">⛔</span><div class="txt"><b>' + esc(c.persona) + '</b>Figura como ' + esc(c.rol) + ' en ' + esc(c.min.nombre) + ' y aparece en suspensión (privilegio: ' + esc(c.susp.map(s => s.ministerio).join(', ')) + ').</div><a class="btn btn-sm" href="MinisteriosConsejoLocal.html#abrir=' + c.min.id + '">Abrir</a></div>').join('')
+    : '';
+  renderBusqueda();
+}
+function renderBusqueda(){
+  const t = norm(q('busq-persona').value), cont = q('res-busqueda');
+  if(t.length < 2){ cont.innerHTML = ''; return; }
+  const mapa = {};
+  const get = n => (mapa[norm(n)] = mapa[norm(n)] || { nombre:n, lineas:[] });
+  mins.forEach(m => [['directiva','Directiva'],['integrantes','Integrante']].forEach(([k,et]) => (m[k]||[]).forEach(x => {
+    if(norm(x.nombre).includes(t)){
+      const e = estadoMiembro(x), est = e==='vigente' ? '' : e==='fin' ? ' (ya no vigente)' : ' (por iniciar)';
+      get(x.nombre).lineas.push('<a href="MinisteriosConsejoLocal.html#abrir=' + m.id + '">' + esc(m.nombre) + '</a>: ' + esc(x.rol) + ' (' + et.toLowerCase() + ')' + est);
+    }
+  })));
+  disc.forEach(c => { if(norm(c.nombre).includes(t)) get(c.nombre).lineas.push('<a href="DisciplinaConsejoLocal.html#abrir=' + c.id + '">Disciplina</a>: ' + (c.estado==='suspendido' ? '<b style="color:var(--susp);">En suspensión</b>' : 'Habilitado') + ', privilegio ' + esc(c.ministerio) + ', desde ' + fmtFecha(c.fechaInicio)); });
+  const res = Object.values(mapa).sort((a,b) => a.nombre.localeCompare(b.nombre,'es'));
+  cont.innerHTML = res.length ? res.map(r => '<div class="res-persona"><div class="fm-nombre">' + esc(r.nombre) + '</div>' + r.lineas.map(l => '<div class="fm-sub">' + l + '</div>').join('') + '</div>').join('') : '<p class="muted" style="font-size:.9rem;">No hay registros con ese nombre en Ministerios ni en Disciplina.</p>';
+}
+function errorFirestore(e){
+  console.error(e);
+  const b = q('banner-error');
+  if(e && e.code === 'permission-denied'){
+    b.innerHTML = '<b>Firestore rechazó el acceso.</b> Verifica que tu correo esté en la lista de autorizados de las reglas de Firestore para las colecciones <b>disciplina</b>, <b>ministerios</b> y <b>personas</b>.';
+  }else{
+    b.textContent = 'Error de conexión con Firestore: ' + (e && e.message ? e.message : e);
+  }
+  b.style.display = 'block';
+}
+
+function msgAuth(e){
+  const m = { 'auth/invalid-credential':'Correo o contraseña incorrectos.', 'auth/wrong-password':'Correo o contraseña incorrectos.', 'auth/user-not-found':'Correo o contraseña incorrectos.',
+    'auth/invalid-email':'El correo no tiene un formato válido.', 'auth/too-many-requests':'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
+    'auth/network-request-failed':'Sin conexión con Firebase. Revisa tu internet.', 'auth/operation-not-allowed':'El inicio de sesión con correo no está habilitado en Firebase (Authentication → Sign-in method).',
+    'auth/user-disabled':'Esta cuenta está deshabilitada.' };
+  return m[e.code] || ('No se pudo iniciar sesión: ' + (e.message || e));
+}
+async function iniciarSesion(){
+  const correo = q('lg-correo').value.trim(), clave = q('lg-clave').value, err = q('lg-error');
+  err.style.display = 'none'; q('login-aviso').textContent = '';
+  if(!correo || !clave){ err.textContent = 'Escribe tu correo y contraseña.'; err.style.display = 'block'; return; }
+  q('lg-btn').disabled = true;
+  try{ await auth.signInWithEmailAndPassword(correo, clave); q('lg-clave').value = ''; }
+  catch(e){ err.textContent = msgAuth(e); err.style.display = 'block'; }
+  q('lg-btn').disabled = false;
+}
+async function recuperarClave(){
+  const correo = q('lg-correo').value.trim(), err = q('lg-error');
+  err.style.display = 'none';
+  if(!correo){ err.textContent = 'Escribe tu correo arriba y vuelve a presionar “Olvidé mi contraseña”.'; err.style.display = 'block'; return; }
+  try{ await auth.sendPasswordResetEmail(correo); q('login-aviso').textContent = 'Si el correo está registrado, te enviamos un enlace para crear una nueva contraseña.'; }
+  catch(e){ err.textContent = msgAuth(e); err.style.display = 'block'; }
+}
+function cerrarSesion(){ auth.signOut(); }
+function reiniciarInactividad(){
+  clearTimeout(inactTimer);
+  if(!usuario) return;
+  inactTimer = setTimeout(() => { q('login-aviso').textContent = 'La sesión se cerró por inactividad (30 minutos).'; auth.signOut(); }, LIMITE_INACTIVIDAD);
+}
+['click','keydown','touchstart','scroll'].forEach(ev => document.addEventListener(ev, reiniciarInactividad, { passive:true }));
+
+(async function start(){
+  // El inicio de sesión de Firebase solo funciona en páginas http(s), no en archivos descargados (file:// o content://).
+  if(location.protocol !== 'http:' && location.protocol !== 'https:'){
+    q('setup-screen').style.display = 'flex';
+    q('setup-error').innerHTML = '<b>Este módulo no puede abrirse como archivo descargado.</b> El inicio de sesión necesita una dirección <b>https://</b>. Publícalo en GitHub Pages (junto a tus otros sistemas) y ábrelo desde esa dirección.';
+    return;
+  }
+  const listo = await asegurarFirebaseCargado();
+  if(!listo){
+    q('setup-screen').style.display = 'flex';
+    q('setup-error').innerHTML = 'No se pudo cargar Firebase desde internet. Casi siempre es un <b>bloqueador de anuncios o extensión</b>, o una <b>red que bloquea gstatic.com y jsdelivr.net</b>. Desactívalo para esta página y recarga.';
+    return;
+  }
+  try{
+    inicializarFirebase(cargarConfigGuardada() || EMBEDDED_FIREBASE_CONFIG);
+    try{ await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); }catch(e){} // la sesión termina al cerrar la pestaña
+    let authListo = false;
+    const guardia = setTimeout(() => {
+      if(authListo) return;
+      q('setup-screen').style.display = 'flex';
+      q('setup-error').innerHTML = '<b>No se pudo verificar la sesión.</b> Abre el módulo desde su dirección https y confirma que el navegador permita almacenamiento y cookies para el sitio.';
+    }, 10000);
+    auth.onAuthStateChanged(user => {
+      authListo = true; clearTimeout(guardia); q('setup-screen').style.display = 'none';
+      if(user){
+        usuario = user; q('usuario-email').textContent = user.email;
+        q('login-screen').style.display = 'none'; q('app').style.display = 'block';
+        iniciarApp(); reiniciarInactividad();
+      }else{
+        usuario = null; clearTimeout(inactTimer); detenerApp();
+        q('app').style.display = 'none'; q('login-screen').style.display = 'flex';
+      }
+    });
+  }catch(e){
+    q('setup-screen').style.display = 'flex';
+    q('setup-error').textContent = 'No se pudo conectar: ' + e.message;
+  }
+})();
+</script>
+</body>
+</html>

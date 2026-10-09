@@ -1,0 +1,2625 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minutas · Consejo Local</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+  // Verificación de respaldo: si por bloqueador de anuncios, extensión o red los scripts
+  // de gstatic.com no cargaron, se reintenta con una fuente alterna (jsDelivr) antes de arrancar.
+  function cargarScript(src){
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('No se pudo cargar: ' + src));
+      document.head.appendChild(s);
+    });
+  }
+  async function asegurarFirebaseCargado(){
+    if(typeof firebase !== 'undefined' && firebase.firestore && firebase.storage && firebase.auth) return true;
+    try{
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js');
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.js');
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-storage-compat.js');
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.js');
+      return typeof firebase !== 'undefined' && firebase.firestore && firebase.storage && firebase.auth;
+    }catch(e){
+      return false;
+    }
+  }
+</script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+  :root{
+    /* Paleta idéntica al Calendarizador de Actividades, para que ambos sistemas compartan identidad visual */
+    --navy:#1a2744; --navy-mid:#243260; --navy-light:#2e3f7a;
+    --gold:#c9a84c; --gold-light:#e2c67a; --gold-pale:#fdf6e3;
+    --cream:#f8f6f0; --white:#ffffff;
+    --gray-100:#f3f4f6; --gray-200:#e5e7eb; --gray-400:#9ca3af; --gray-600:#4b5563; --gray-800:#1f2937;
+    --danger:#dc2626; --success:#16a34a;
+    --shadow-sm:0 1px 3px rgba(0,0,0,.1); --shadow-md:0 4px 12px rgba(0,0,0,.12); --shadow-lg:0 8px 24px rgba(0,0,0,.15);
+    --radius:8px; --radius-lg:12px;
+
+    /* Alias internos del sistema de minutas, apuntando a la paleta de arriba */
+    --ink:var(--navy);
+    --ink-2:var(--navy-light);
+    --text:var(--gray-800);
+    --muted:var(--gray-400);
+    --line:var(--gray-200);
+    --paper:var(--cream);
+    --paper-2:var(--gray-100);
+    --paper-3:var(--gray-200);
+    --gold-dim:var(--gold-light);
+
+    --sage:#166534; --sage-bg:#dcfce7;
+    --rust:#991b1b; --rust-bg:#fee2e2;
+    --amber:#9a3412; --amber-bg:#ffedd5;
+    --info:#1e40af; --info-bg:#dbeafe;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.serif{font-family:'Playfair Display',serif;}
+  .mono{font-family:'SF Mono','Consolas',monospace;}
+  ::selection{background:var(--gold-light);color:var(--navy);}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important;}
+  }
+
+  .paper-bg{ background:var(--paper); min-height:100vh; }
+
+  /* Scrollbars — igual que el calendarizador */
+  ::-webkit-scrollbar{width:6px;height:6px;}
+  ::-webkit-scrollbar-track{background:var(--gray-100);}
+  ::-webkit-scrollbar-thumb{background:var(--gray-400);border-radius:3px;}
+
+  /* Date tile - insignia estilo calendario (día/mes), inspirada en .date-box del Calendarizador */
+  .date-tile{
+    display:inline-flex;flex-direction:column;align-items:center;justify-content:center;
+    min-width:58px;height:58px;border-radius:var(--radius);
+    flex-shrink:0; background:var(--navy); padding:6px 10px;
+  }
+  .date-tile .day{font-family:'Inter',sans-serif;font-weight:700;font-size:1.35rem;line-height:1;color:#fff;}
+  .date-tile .mon{font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;margin-top:3px;color:var(--gold-light);}
+  .date-tile.on-navy{background:var(--gold);box-shadow:0 2px 8px rgba(201,168,76,.4);}
+  .date-tile.on-navy .day{color:var(--navy);}
+  .date-tile.on-navy .mon{color:var(--navy-mid);}
+
+  .nota-tag{
+    display:inline-flex;align-items:center;gap:4px;
+    font-size:11px;font-weight:600;
+    color:var(--navy);border:1px solid var(--gold);
+    padding:1px 8px;border-radius:999px;background:var(--gold-pale);
+    white-space:nowrap;
+  }
+
+  .card{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-sm);
+    overflow:hidden;
+  }
+  .input, select.input, textarea.input{
+    width:100%;
+    background:var(--white);
+    border:1.5px solid var(--gray-200);
+    border-radius:var(--radius);
+    padding:9px 12px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    color:var(--gray-800);
+    outline:none;
+    transition:border-color .2s, box-shadow .2s;
+  }
+  .input::placeholder, textarea.input::placeholder{color:var(--gray-400);}
+  .input:focus, select.input:focus, textarea.input:focus{
+    border-color:var(--gold);
+    box-shadow:0 0 0 3px rgba(201,168,76,.15);
+  }
+  label.f-label{
+    font-size:.78rem; font-weight:600; letter-spacing:.03em;
+    color:var(--navy); text-transform:uppercase; display:block; margin-bottom:5px;
+  }
+  .btn{
+    display:inline-flex;align-items:center;gap:6px;justify-content:center;
+    border-radius:var(--radius); font-weight:500; font-size:13.5px;
+    padding:9px 16px; cursor:pointer; border:none;
+    transition:all .2s;
+    user-select:none;
+  }
+  .btn-primary{background:var(--navy); color:#fff;}
+  .btn-primary:hover{background:var(--navy-light);}
+  .btn-ghost{background:transparent;color:var(--gray-600); border:1.5px solid var(--gray-200);}
+  .btn-ghost:hover{border-color:var(--navy); color:var(--navy);}
+  .btn-gold{background:var(--gold); color:var(--navy); font-weight:600;}
+  .btn-gold:hover{background:var(--gold-light);}
+  .btn-danger{background:var(--danger);color:#fff;}
+  .btn-danger:hover{background:#b91c1c;}
+  .btn-sm{padding:5px 10px;font-size:12px;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+
+  .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap;}
+  .badge-aprobado{background:var(--sage-bg);color:var(--sage);}
+  .badge-no_aprobado{background:var(--rust-bg);color:var(--rust);}
+  .badge-pendiente{background:var(--amber-bg);color:var(--amber);}
+  .badge-informativo{background:var(--info-bg);color:var(--info);}
+  .badge-resuelto{background:var(--sage-bg);color:var(--sage);}
+  .badge-aplazado{background:var(--amber-bg);color:var(--amber);}
+
+  .navlink{
+    display:flex;align-items:center;gap:10px;
+    padding:9px 12px;border-radius:6px;font-size:13.5px;font-weight:500;color:var(--gray-600);
+    cursor:pointer;border-left:3px solid transparent;
+  }
+  .navlink:hover{background:var(--gold-pale);color:var(--navy);}
+  .navlink.active{background:var(--gold-pale);color:var(--navy);border-left-color:var(--gold);font-weight:700;}
+  .navlink .cnt{
+    margin-left:auto;font-size:11px;
+    background:var(--gray-100);padding:1px 7px;border-radius:999px;color:var(--gray-600);
+  }
+  .navlink.active .cnt{background:var(--gold);color:var(--navy);}
+
+  .section-panel{display:none;}
+  .section-panel.active{display:block;}
+
+  .item-card{border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:14px;background:var(--white);transition:box-shadow .2s, border-color .2s;}
+  .item-card:hover{box-shadow:var(--shadow-sm);border-color:var(--gold-light);}
+  .item-card + .item-card{margin-top:10px;}
+
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(0,0,0,.5);
+    display:flex;align-items:center;justify-content:center;z-index:60;padding:16px;
+  }
+  .modal-box{
+    background:var(--white);border-radius:var(--radius-lg);
+    max-width:560px;width:100%;max-height:88vh;overflow-y:auto;
+    box-shadow:var(--shadow-lg);
+    border-top:3px solid var(--gold);
+  }
+
+  .toast{
+    position:fixed;bottom:18px;right:18px;z-index:80;
+    background:var(--success);color:#fff;padding:12px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;
+    box-shadow:var(--shadow-lg);
+    display:flex;align-items:center;gap:8px;
+  }
+
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+  .dot-saved{background:var(--success);}
+  .dot-saving{background:var(--gold);animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+  .divider-orn{
+    display:flex;align-items:center;gap:10px;color:var(--gold);margin:22px 0 12px;
+  }
+  .divider-orn::before{content:'';width:10px;height:1px;background:var(--gold);}
+  .divider-orn::after{content:'';flex:1;height:1px;background:linear-gradient(to right, var(--gold), transparent);}
+
+  /* Barra superior — igual al header navy del Calendarizador */
+  header.app-header{
+    background:linear-gradient(135deg,var(--navy) 0%,var(--navy-mid) 60%,var(--navy-light) 100%) !important;
+    box-shadow:var(--shadow-lg);
+  }
+
+  /* Print / acta view — documento clásico de papel */
+  #acta-print{
+    background:#FFFFFF !important;
+    border:1px solid var(--gray-200) !important;
+    color:var(--gray-800);
+    box-shadow:var(--shadow-md);
+    overflow:visible;
+  }
+  @media print{
+    .no-print{display:none !important;}
+    #acta-print{
+      box-shadow:none !important;
+      border:none !important;
+      max-width:100% !important;
+      margin:0 !important;
+      overflow:visible !important;
+    }
+    .card{overflow:visible !important;}
+  }
+
+  textarea.input{resize:vertical;min-height:64px;}
+
+  /* Editor de texto enriquecido (negrita, cursiva, subrayado, resaltado) */
+  .rte-toolbar{display:flex;gap:4px;margin-bottom:5px;flex-wrap:wrap;}
+  .rte-btn{border:1px solid var(--gray-200);background:var(--white);color:var(--gray-600);font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer;line-height:1.2;font-family:'Inter',sans-serif;}
+  .rte-btn:hover{border-color:var(--gold);color:var(--navy);}
+  .rte-btn-hl{background:#fde68a;border-color:#f5ce4a;color:#78350f;}
+  .rte-btn-hl:hover{background:#fcd34d;}
+  .rte-editable{min-height:64px;overflow-y:auto;line-height:1.5;outline:none;}
+  .rte-editable:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,.15);}
+  .rte-editable:empty:before{content:attr(data-placeholder);color:var(--gray-400);}
+  .rte-editable b, .rte-editable strong{font-weight:700;}
+  .rte-editable u{text-decoration:underline;}
+  .rte-content{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .rte-content b, .rte-content strong{font-weight:700;}
+  .rte-content u{text-decoration:underline;}
+
+  .fade-in{animation:fadeIn .18s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:none;}}
+
+  .tab-mini{
+    font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:6px;cursor:pointer;color:var(--gray-400);
+  }
+  .tab-mini.active{background:var(--navy);color:#fff;}
+
+  /* Botones de header (sobre fondo navy) — igual que .btn-header del Calendarizador */
+  .btn-header{background:rgba(201,168,76,.2);border:1px solid rgba(201,168,76,.4);color:var(--gold-light);padding:7px 14px;border-radius:var(--radius);font-size:.8rem;font-weight:500;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:6px;}
+  .btn-header:hover{background:var(--gold);color:var(--navy);}
+</style>
+</head>
+<body class="paper-bg">
+
+<!-- ============ ACCESO ============ -->
+<div id="login-screen" class="min-h-screen flex items-center justify-center p-5" style="display:none;">
+  <div class="card p-7 max-w-sm w-full fade-in" style="border-top:3px solid var(--gold);">
+    <div class="flex items-center gap-3 mb-3">
+      <div class="date-tile"><span class="day">🔒</span><span class="mon">Acceso</span></div>
+      <div>
+        <h1 class="text-xl font-semibold serif" style="color:var(--navy)">Sistema de Minutas</h1>
+        <p class="text-sm" style="color:var(--muted)">Solo para miembros autorizados del Consejo Local</p>
+      </div>
+    </div>
+    <p id="login-aviso" class="text-sm mb-2" style="color:#9a3412;"></p>
+    <label for="lg-correo" class="text-xs font-semibold" style="color:var(--navy)">Correo</label>
+    <input type="email" id="lg-correo" class="input mb-3" autocomplete="username" onkeydown="if(event.key==='Enter')iniciarSesion()">
+    <label for="lg-clave" class="text-xs font-semibold" style="color:var(--navy)">Contraseña</label>
+    <input type="password" id="lg-clave" class="input mb-2" autocomplete="current-password" onkeydown="if(event.key==='Enter')iniciarSesion()">
+    <p id="lg-error" class="text-sm" style="color:var(--rust);display:none;"></p>
+    <button class="btn btn-primary w-full mt-2" id="lg-btn" onclick="iniciarSesion()">Entrar</button>
+    <p class="text-center mt-3"><button type="button" class="text-sm" style="color:var(--navy-light);background:none;border:none;cursor:pointer;" onclick="recuperarClave()">Olvidé mi contraseña</button></p>
+  </div>
+</div>
+
+<!-- ============ SETUP SCREEN ============ -->
+<div id="setup-screen" class="min-h-screen flex items-center justify-center p-5" style="display:none;">
+  <div class="card p-7 max-w-xl w-full fade-in">
+    <div class="flex items-center gap-3 mb-1">
+      <div class="date-tile"><span class="day">✓</span><span class="mon">Setup</span></div>
+      <div>
+        <h1 class="text-xl font-semibold" style="color:var(--ink)">Configuración inicial</h1>
+        <p class="text-sm" style="color:var(--muted)">Sistema de Minutas · Consejo Local</p>
+      </div>
+    </div>
+    <p class="text-sm mt-4 leading-relaxed" style="color:var(--text)">
+      Este sistema guarda las sesiones en <b>Firebase Firestore</b>, así que necesita la configuración de tu proyecto
+      (la misma que usas en tus otros sistemas, o uno nuevo). La configuración se guarda solo en este navegador,
+      no queda escrita en el archivo — así puedes publicar el HTML en GitHub Pages sin exponer tus llaves en el código.
+    </p>
+    <ol class="text-sm mt-3 space-y-1 leading-relaxed" style="color:var(--muted)">
+      <li>1. Ve a la <span class="mono">Consola de Firebase → Configuración del proyecto → Tus apps</span>.</li>
+      <li>2. Copia el objeto <span class="mono">firebaseConfig</span>.</li>
+      <li>3. Pégalo abajo tal cual (formato JSON) y presiona Conectar.</li>
+      <li>4. En Firestore, crea la colección <span class="mono">sesiones</span> (se crea sola al guardar la primera sesión).</li>
+    </ol>
+    <textarea id="setup-config-input" class="input mono mt-4" rows="8" placeholder='{
+  "apiKey": "...",
+  "authDomain": "...",
+  "projectId": "...",
+  "storageBucket": "...",
+  "messagingSenderId": "...",
+  "appId": "..."
+}'></textarea>
+    <p id="setup-error" class="text-sm mt-2" style="color:var(--rust);display:none;"></p>
+    <div class="flex justify-end gap-2 mt-4">
+      <button class="btn btn-primary" onclick="intentarConectar()">Conectar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app" style="display:none;">
+
+  <!-- Top bar -->
+  <header class="app-header no-print" style="position:sticky;top:0;z-index:40;">
+    <div class="max-w-[1400px] mx-auto px-5 py-3 flex flex-wrap items-center gap-4">
+      <div class="date-tile on-navy" id="topbar-date"><span class="day">—</span><span class="mon">· · ·</span></div>
+      <div class="min-w-0">
+        <h1 class="text-base font-semibold serif truncate" style="color:#fff">Iglesia Evangélica Centroamericana "Salem"</h1>
+        <p class="text-xs" style="color:var(--gold-light);text-transform:uppercase;letter-spacing:.04em;">Sistema de Minutas · Consejo Local — Patzún, Chimaltenango</p>
+      </div>
+      <div class="ml-auto flex items-center gap-2">
+        <div id="save-status" class="hidden md:flex items-center gap-2 text-xs mono mr-2" style="color:rgba(255,255,255,.6)">
+          <span class="dot dot-saved" id="save-dot"></span><span id="save-text">Sin cambios</span>
+        </div>
+        <a class="btn-header" href="index.html" style="text-decoration:none;">⌂ Inicio</a>
+        <button class="btn-header" onclick="abrirBusquedaGlobal()">🔍 Buscar</button>
+        <button class="btn-header" onclick="abrirHistorial()">📖 Sesiones</button>
+        <button class="btn-header" onclick="abrirAjustes()">⚙️ Ajustes</button>
+        <button class="btn-header" id="btn-salir" onclick="cerrarSesion()">Salir</button>
+        <button class="btn btn-gold btn-sm" onclick="abrirModalNuevaSesion()">＋ Nueva sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Layout -->
+  <div class="max-w-[1400px] mx-auto px-5 py-5 flex gap-5" id="layout-root">
+
+    <!-- Sidebar -->
+    <aside class="w-[230px] shrink-0 no-print" id="sidebar">
+      <div class="card p-3 sticky" style="top:80px;">
+        <p class="text-xs font-semibold px-2 mb-2" style="color:var(--muted)" id="sidebar-fecha">Sin sesión activa</p>
+        <nav class="space-y-1" id="nav-list">
+          <div class="navlink active" data-panel="datos" onclick="cambiarPanel('datos')">🗓️ Datos de sesión</div>
+          <div class="navlink" data-panel="pendientes" onclick="cambiarPanel('pendientes')">📌 Pendientes heredados <span class="cnt" id="cnt-pendientes">0</span></div>
+          <div class="navlink" data-panel="correspondencias" onclick="cambiarPanel('correspondencias')">✉️ Correspondencias <span class="cnt" id="cnt-correspondencias">0</span></div>
+          <div class="navlink" data-panel="audiencias" onclick="cambiarPanel('audiencias')">🙋 Audiencias <span class="cnt" id="cnt-audiencias">0</span></div>
+          <div class="navlink" data-panel="citados" onclick="cambiarPanel('citados')">📋 Citados <span class="cnt" id="cnt-citados">0</span></div>
+          <div class="navlink" data-panel="informes" onclick="cambiarPanel('informes')">📣 Informes <span class="cnt" id="cnt-informes">0</span></div>
+          <div class="navlink" data-panel="temas" onclick="cambiarPanel('temas')">💬 Temas a tratar <span class="cnt" id="cnt-temas">0</span></div>
+          <div class="navlink" data-panel="acuerdos" onclick="cambiarPanel('acuerdos')">🗓️ Acuerdos y fechas <span class="cnt" id="cnt-acuerdos">0</span></div>
+          <div class="navlink" data-panel="asistencia" onclick="cambiarPanel('asistencia')">✅ Asistencia <span class="cnt" id="cnt-asistencia">0</span></div>
+          <div class="navlink" data-panel="acta" onclick="cambiarPanel('acta')">🖨️ Vista de acta</div>
+        </nav>
+        <div class="divider-orn"><span class="text-[10px] mono">•</span></div>
+        <button class="btn btn-primary w-full btn-sm" onclick="finalizarSesion()" id="btn-finalizar">Finalizar sesión</button>
+        <button class="btn btn-ghost w-full btn-sm mt-2" onclick="reabrirSesion()" id="btn-reabrir" style="display:none;">Reabrir sesión</button>
+        <button class="btn btn-danger w-full btn-sm mt-2" onclick="eliminarSesionActual()">🗑 Eliminar esta sesión</button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 min-w-0" id="main-content">
+
+      <div id="no-session-msg" class="card p-10 text-center">
+        <div class="date-tile mx-auto mb-4"><span class="day">?</span><span class="mon">· · ·</span></div>
+        <h2 class="text-lg font-semibold serif" style="color:var(--ink)">No hay ninguna sesión activa</h2>
+        <p class="text-sm mt-1" style="color:var(--muted)">Crea una nueva sesión o abre una desde el historial para empezar a registrar la minuta.</p>
+        <div class="flex justify-center gap-2 mt-4">
+          <button class="btn btn-gold" onclick="abrirModalNuevaSesion()">＋ Nueva sesión</button>
+          <button class="btn btn-ghost" onclick="abrirHistorial()">📖 Ver historial</button>
+        </div>
+      </div>
+
+      <div id="session-panels" style="display:none;">
+
+        <!-- DATOS -->
+        <section class="section-panel active" id="panel-datos">
+          <div class="card p-5">
+            <h2 class="text-lg font-semibold serif mb-4" style="color:var(--ink)">Datos generales de la sesión</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div><label class="f-label">Fecha</label><input type="date" class="input" id="f-fecha" onchange="actualizarCampoSesion('fecha', this.value)"></div>
+              <div><label class="f-label">Tipo de sesión</label>
+                <select class="input" id="f-tipo" onchange="actualizarCampoSesion('tipo', this.value)">
+                  <option value="ordinaria">Ordinaria</option>
+                  <option value="extraordinaria">Extraordinaria</option>
+                </select>
+              </div>
+              <div><label class="f-label">Lugar</label><input type="text" class="input" id="f-lugar" placeholder="Salón del Consejo Local" onchange="actualizarCampoSesion('lugar', this.value)"></div>
+              <div><label class="f-label">Hora de inicio</label><input type="time" class="input" id="f-horaInicio" onchange="actualizarCampoSesion('horaInicio', this.value)"></div>
+              <div><label class="f-label">Hora de finalización</label><input type="time" class="input" id="f-horaFin" onchange="actualizarCampoSesion('horaFin', this.value)"></div>
+              <div><label class="f-label">Estado</label><div class="input" style="background:var(--paper-2);border:none;" id="f-estado-display">Borrador</div></div>
+              <div><label class="f-label">Modera</label><input type="text" class="input" id="f-moderador" placeholder="Nombre" onchange="actualizarCampoSesion('moderador', this.value)"></div>
+              <div><label class="f-label">Secretario(a)</label><input type="text" class="input" id="f-secretario" placeholder="Nombre" onchange="actualizarCampoSesion('secretario', this.value)"></div>
+            </div>
+          </div>
+
+          <div class="card p-5 mt-4">
+            <h2 class="text-lg font-semibold serif mb-1" style="color:var(--ink)">🙏 Apertura de la sesión</h2>
+            <p class="text-xs mb-4" style="color:var(--muted)">Reflexión bíblica y lectura de la agenda con la que el moderador da inicio a la reunión.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+              <div><label class="f-label">Encargado(a) de la reflexión</label><input type="text" class="input" id="f-reflexion-encargado" placeholder="Nombre" onchange="actualizarCampoReflexion('encargado', this.value)"></div>
+              <div><label class="f-label">Referencia bíblica</label><input type="text" class="input" id="f-reflexion-referencia" placeholder="Ej. Salmos 23:1-6" onchange="actualizarCampoReflexion('referencia', this.value)"></div>
+            </div>
+            <div class="mb-4">
+              <label class="f-label">Contenido / mensaje de la reflexión</label>
+              <div class="rte-toolbar no-print">
+                <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteExec('f-reflexion-contenido','bold')"><b>N</b></button>
+                <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteExec('f-reflexion-contenido','italic')"><i>C</i></button>
+                <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteExec('f-reflexion-contenido','underline')"><u>S</u></button>
+                <button type="button" class="rte-btn rte-btn-hl" onmousedown="event.preventDefault()" onclick="rteExec('f-reflexion-contenido','hilite')">🖍️ Resaltar</button>
+                <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteExec('f-reflexion-contenido','clear')">Quitar formato</button>
+              </div>
+              <div class="input rte-editable" id="f-reflexion-contenido" contenteditable="true" spellcheck="true" lang="es" data-placeholder="Resumen o puntos principales de la reflexión bíblica..." style="min-height:80px;" onblur="guardarReflexionContenido()"></div>
+            </div>
+            <div>
+              <label class="f-label">Agenda del día</label>
+              <div class="rte-toolbar no-print">
+                <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteExec('f-agenda','bold')"><b>N</b></button>
+                <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteExec('f-agenda','italic')"><i>C</i></button>
+                <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteExec('f-agenda','underline')"><u>S</u></button>
+                <button type="button" class="rte-btn rte-btn-hl" onmousedown="event.preventDefault()" onclick="rteExec('f-agenda','hilite')">🖍️ Resaltar</button>
+                <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteExec('f-agenda','clear')">Quitar formato</button>
+              </div>
+              <div class="input rte-editable" id="f-agenda" contenteditable="true" spellcheck="true" lang="es" data-placeholder="Puntos que se leyeron en la agenda de esta sesión..." style="min-height:80px;" onblur="guardarAgenda()"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PENDIENTES HEREDADOS -->
+        <section class="section-panel" id="panel-pendientes">
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h2 class="text-lg font-semibold serif" style="color:var(--ink)">Pendientes de sesiones anteriores</h2>
+            <div class="flex gap-2 flex-wrap">
+              <button class="btn btn-ghost btn-sm" onclick="cargarPendientesHeredados(true)">↻ Actualizar</button>
+              <button class="btn btn-ghost btn-sm" onclick="abrirHistorialResueltos()">📜 Ver resueltos</button>
+              <button class="btn btn-gold btn-sm" onclick="generarInformePendientes()">🖨️ Imprimir informe para mesa directiva</button>
+            </div>
+          </div>
+          <p class="text-sm mb-3" style="color:var(--muted)">
+            Estos temas quedaron abiertos en sesiones pasadas y no se han marcado como resueltos. Da seguimiento aquí:
+            márcalos como resueltos (con nota de resolución) o déjalos pendientes para que sigan apareciendo en la próxima sesión.
+          </p>
+          <div id="lista-pendientes"></div>
+        </section>
+
+        <!-- SECCIONES DINÁMICAS -->
+        <section class="section-panel" id="panel-correspondencias"></section>
+        <section class="section-panel" id="panel-audiencias"></section>
+        <section class="section-panel" id="panel-citados"></section>
+        <section class="section-panel" id="panel-informes"></section>
+        <section class="section-panel" id="panel-temas"></section>
+        <section class="section-panel" id="panel-acuerdos"></section>
+
+        <!-- ASISTENCIA -->
+        <section class="section-panel" id="panel-asistencia">
+          <div class="card p-5">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-lg font-semibold serif" style="color:var(--ink)">Asistencia del Consejo Local</h2>
+              <button class="btn btn-ghost btn-sm" onclick="abrirAjustes('roster')">⚙️ Editar nómina</button>
+            </div>
+            <div id="lista-asistencia" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
+            <div class="divider-orn"><span class="text-[10px] mono">invitados</span></div>
+            <div class="flex gap-2 mb-2">
+              <input type="text" class="input" id="f-invitado-nombre" placeholder="Nombre de invitado / visita">
+              <button class="btn btn-ghost btn-sm shrink-0" onclick="agregarInvitado()">＋ Agregar</button>
+            </div>
+            <div id="lista-invitados" class="space-y-1"></div>
+          </div>
+        </section>
+
+        <!-- VISTA DE ACTA -->
+        <section class="section-panel" id="panel-acta">
+          <div class="flex items-center justify-between mb-3 no-print">
+            <h2 class="text-lg font-semibold serif" style="color:var(--ink)">Vista previa del acta</h2>
+            <div class="flex gap-2">
+              <button class="btn btn-ghost btn-sm" onclick="copiarActaTexto()">📋 Copiar texto</button>
+              <button class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+            </div>
+          </div>
+          <div class="card p-8" id="acta-print" style="max-width:820px;margin:0 auto;">
+            <div id="acta-contenido"></div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ============ MODAL: Nueva sesión ============ -->
+<div class="modal-backdrop no-print" id="modal-nueva" style="display:none;">
+  <div class="modal-box p-6">
+    <h3 class="text-lg font-semibold serif mb-4" style="color:var(--ink)">Nueva sesión</h3>
+    <div class="space-y-3">
+      <div><label class="f-label">Fecha</label><input type="date" class="input" id="nm-fecha"></div>
+      <div><label class="f-label">Tipo</label>
+        <select class="input" id="nm-tipo">
+          <option value="ordinaria">Ordinaria</option>
+          <option value="extraordinaria">Extraordinaria</option>
+        </select>
+      </div>
+      <div><label class="f-label">Lugar</label><input type="text" class="input" id="nm-lugar" placeholder="Salón del Consejo Local"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="f-label">Modera</label><input type="text" class="input" id="nm-moderador"></div>
+        <div><label class="f-label">Secretario(a)</label><input type="text" class="input" id="nm-secretario"></div>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button class="btn btn-ghost" onclick="cerrarModal('modal-nueva')">Cancelar</button>
+      <button class="btn btn-gold" onclick="crearNuevaSesion()">Crear e iniciar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: Historial ============ -->
+<div class="modal-backdrop no-print" id="modal-historial" style="display:none;">
+  <div class="modal-box p-6" style="max-width:720px;">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold serif" style="color:var(--ink)">Historial de sesiones</h3>
+      <input type="text" class="input" style="width:200px;" placeholder="Buscar por fecha o lugar..." id="hist-buscar" oninput="renderHistorial()">
+    </div>
+    <div id="hist-lista" class="space-y-2"></div>
+    <div class="flex justify-end mt-4">
+      <button class="btn btn-ghost" onclick="cerrarModal('modal-historial')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: Búsqueda general ============ -->
+<div class="modal-backdrop no-print" id="modal-busqueda" style="display:none;">
+  <div class="modal-box p-6" style="max-width:720px;">
+    <h3 class="text-lg font-semibold serif mb-1" style="color:var(--ink)">Buscar en todas las sesiones</h3>
+    <p class="text-xs mb-3" style="color:var(--muted)">Busca por nombre, decisión, tema, o cualquier palabra — en correspondencias, audiencias, citados, informes, temas, acuerdos y seguimientos, de todas las sesiones registradas.</p>
+    <input type="text" class="input" id="busqueda-input" placeholder="Ej. generador eléctrico, presupuesto, nombre de un hermano…" oninput="ejecutarBusquedaGlobalDebounced()">
+    <div id="busqueda-resultados" class="mt-4 space-y-2" style="max-height:55vh;overflow-y:auto;">
+      <p class="text-sm text-center py-6" style="color:var(--muted)">Cargando historial completo…</p>
+    </div>
+    <div class="flex justify-end mt-4">
+      <button class="btn btn-ghost" onclick="cerrarModal('modal-busqueda')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: Historial de puntos resueltos ============ -->
+<div class="modal-backdrop no-print" id="modal-resueltos" style="display:none;">
+  <div class="modal-box p-6" style="max-width:720px;">
+    <div class="flex items-center justify-between mb-1 flex-wrap gap-2">
+      <h3 class="text-lg font-semibold serif" style="color:var(--ink)">Historial de puntos resueltos</h3>
+      <input type="text" class="input" style="width:220px;" id="resueltos-buscar" placeholder="Filtrar por tema..." oninput="renderResueltosLista()">
+    </div>
+    <p class="text-xs mb-3" style="color:var(--muted)">Todos los temas ya resueltos, de todas las sesiones. Si surge información nueva sobre alguno, puedes reabrirlo — volverá a aparecer en "Pendientes de sesiones anteriores".</p>
+    <div id="resueltos-lista" class="space-y-2" style="max-height:55vh;overflow-y:auto;">
+      <p class="text-sm text-center py-6" style="color:var(--muted)">Cargando…</p>
+    </div>
+    <div class="flex justify-end mt-4">
+      <button class="btn btn-ghost" onclick="cerrarModal('modal-resueltos')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: Ajustes ============ -->
+<div class="modal-backdrop no-print" id="modal-ajustes" style="display:none;">
+  <div class="modal-box p-6">
+    <h3 class="text-lg font-semibold serif mb-4" style="color:var(--ink)">Ajustes</h3>
+    <div class="flex gap-2 mb-4 flex-wrap">
+      <div class="tab-mini active" data-tab="roster" onclick="cambiarTabAjustes('roster')">Nómina del Consejo</div>
+      <div class="tab-mini" data-tab="firebase" onclick="cambiarTabAjustes('firebase')">Conexión</div>
+    </div>
+
+    <div id="ajustes-roster">
+      <p class="text-xs mb-2" style="color:var(--muted)">Esta lista se usa como base para la asistencia de cada nueva sesión.</p>
+      <div id="roster-lista" class="space-y-1 mb-3"></div>
+      <div class="flex gap-2">
+        <input type="text" class="input" id="roster-nuevo" placeholder="Nombre del miembro">
+        <button class="btn btn-ghost btn-sm shrink-0" onclick="agregarMiembroRoster()">＋ Agregar</button>
+      </div>
+    </div>
+
+    <div id="ajustes-firebase" style="display:none;">
+      <p class="text-xs mb-2" style="color:var(--muted)">Proyecto Firestore actualmente conectado:</p>
+      <p class="mono text-sm card p-2" id="firebase-actual" style="background:var(--paper-2);"></p>
+      <button class="btn btn-danger btn-sm mt-3" onclick="olvidarConfiguracion()">Olvidar configuración y reconectar</button>
+    </div>
+
+    <div class="flex justify-end mt-5">
+      <button class="btn btn-primary" onclick="cerrarModal('modal-ajustes')">Listo</button>
+    </div>
+  </div>
+</div>
+
+
+
+<div id="toast-root"></div>
+
+<script>
+/* ============================================================
+   SISTEMA DE MINUTAS · CONSEJO LOCAL
+   Archivo único · Firebase Firestore como backend
+   ============================================================ */
+
+// ---------- Configuración / conexión Firebase ----------
+// Configuración del proyecto de Jose (salem-minutas). Si algún día cambias de proyecto,
+// puedes sobreescribirla desde Ajustes → Conexión, sin tocar este archivo.
+const EMBEDDED_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAPeBr8Rw8Hw5OS0QFIBLdpgFeqaUuzzqs",
+  authDomain: "salem-minutas.firebaseapp.com",
+  projectId: "salem-minutas",
+  storageBucket: "salem-minutas.firebasestorage.app",
+  messagingSenderId: "509496830084",
+  appId: "1:509496830084:web:8865b4265d0065a3333ad1"
+};
+
+let db = null;
+let storage = null;
+let auth = null;
+let firebaseConfig = null;
+let usuarioActual = null, appIniciada = false, inactTimer = null;
+const LIMITE_INACTIVIDAD = 60*60*1000; // 60 minutos (las sesiones del Consejo son largas)
+
+function cargarConfigGuardada(){
+  const raw = localStorage.getItem('minutas_firebase_config');
+  if(!raw) return null;
+  try{ return JSON.parse(raw); }catch(e){ return null; }
+}
+
+function inicializarFirebase(config){
+  try{
+    if(firebase.apps && firebase.apps.length){
+      firebase.app().delete().catch(()=>{});
+    }
+  }catch(e){}
+  firebase.initializeApp(config);
+  db = firebase.firestore();
+  storage = firebase.storage();
+  auth = firebase.auth();
+  // Algunas redes (antivirus, firewalls corporativos, ciertos proveedores de internet) bloquean
+  // el streaming (WebChannel) que Firestore usa por defecto. Esto detecta el bloqueo y cambia
+  // automáticamente a long-polling, que es más compatible aunque un poco más lento.
+  try{
+    db.settings({
+      experimentalAutoDetectLongPolling: true,
+      useFetchStreams: false,
+      merge: true,
+    });
+  }catch(e){ /* si settings() ya fue llamado antes, se ignora */ }
+  firebaseConfig = config;
+}
+
+function intentarConectar(){
+  const raw = document.getElementById('setup-config-input').value.trim();
+  const errEl = document.getElementById('setup-error');
+  errEl.style.display = 'none';
+  let cfg;
+  try{ cfg = JSON.parse(raw); }
+  catch(e){ errEl.textContent = 'El formato no es JSON válido. Copia el objeto tal cual desde la consola de Firebase.'; errEl.style.display='block'; return; }
+  if(!cfg.apiKey || !cfg.projectId){ errEl.textContent = 'Faltan campos (apiKey / projectId). Revisa que copiaste el objeto completo.'; errEl.style.display='block'; return; }
+  try{
+    inicializarFirebase(cfg);
+    localStorage.setItem('minutas_firebase_config', JSON.stringify(cfg));
+    location.reload();
+  }catch(e){
+    errEl.textContent = 'No se pudo conectar: ' + e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+function olvidarConfiguracion(){
+  if(!confirm('Esto borrará la configuración guardada en este navegador. ¿Continuar?')) return;
+  localStorage.removeItem('minutas_firebase_config');
+  location.reload();
+}
+
+// ---------- Definición de secciones (motor genérico) ----------
+const SECTIONS = {
+  correspondencias: {
+    label: 'Correspondencias', icon: '✉️',
+    tituloCampo: 'solicitante',
+    fields: [
+      { key:'solicitante', label:'Quién solicita / remite', type:'text', required:true, placeholder:'Ej. Sociedad Infantil, Grupo Familiar No. 15...' },
+      { key:'asunto', label:'Asunto', type:'text', placeholder:'Ej. Préstamo de sillas, uso de predio...' },
+      { key:'decision', label:'Decisión', type:'select', options:['Aprobado','No aprobado','Pendiente','Informativo'] },
+    ],
+    detalleLabel: 'Detalle adicional',
+    adjuntos: true
+  },
+  audiencias: {
+    label: 'Audiencias', icon: '🙋',
+    tituloCampo: 'nombre',
+    fields: [
+      { key:'nombre', label:'Nombre de quien es recibido', type:'text', required:true },
+      { key:'motivo', label:'Motivo', type:'select', options:['Presentación / visita','Testimonio de conversión','Consulta personal','Otro'] },
+    ],
+    detalleLabel: 'Resumen de lo tratado'
+  },
+  citados: {
+    label: 'Citados', icon: '📋',
+    tituloCampo: 'nombre',
+    fields: [
+      { key:'nombre', label:'Nombre del citado', type:'text', required:true },
+      { key:'motivo', label:'Motivo de la citación', type:'text', placeholder:'Ej. Privilegio, disciplina, consulta...' },
+      { key:'resultado', label:'Resultado / respuesta', type:'select', options:['Aceptó','No aceptó','Pendiente de respuesta','Informado'] },
+      { key:'proximaFecha', label:'Próxima cita (si aplica)', type:'datetime-local' },
+    ],
+    detalleLabel: 'Detalle de lo conversado'
+  },
+  informes: {
+    label: 'Informes', icon: '📣',
+    tituloCampo: 'quienInforma',
+    fields: [
+      { key:'quienInforma', label:'Quién informa (ministerio / hermano)', type:'text', required:true },
+      { key:'tipo', label:'Tipo', type:'select', options:['Informativo','Requiere decisión'] },
+    ],
+    detalleLabel: 'Contenido del informe'
+  },
+  temas: {
+    label: 'Temas a tratar', icon: '💬',
+    tituloCampo: 'tema',
+    fields: [
+      { key:'tema', label:'Tema', type:'text', required:true },
+      { key:'estado', label:'Estado', type:'select', options:['Resuelto','Pendiente','Aplazado'] },
+    ],
+    detalleLabel: 'Discusión y acuerdo tomado',
+    conVotacion: true,
+    adjuntos: true
+  },
+  acuerdos: {
+    label: 'Acuerdos y fechas clave', icon: '🗓️',
+    tituloCampo: 'evento',
+    numerado: true, // Nota No. X
+    fields: [
+      { key:'evento', label:'Evento / acuerdo', type:'text', required:true },
+      { key:'fecha', label:'Fecha', type:'date' },
+      { key:'hora', label:'Hora', type:'time' },
+      { key:'lugar', label:'Lugar', type:'text' },
+      { key:'responsable', label:'Responsable', type:'text' },
+    ],
+    detalleLabel: 'Notas'
+  }
+};
+
+const DECISION_SLUG = (v) => (v||'').toLowerCase().replace(/\s+/g,'_').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+// ---------- Estado en memoria ----------
+let sesionActual = null;      // documento de sesión actualmente abierto (con id)
+let sesionesCache = [];       // últimas sesiones para historial / pendientes
+let panelActivo = 'datos';
+let guardarTimeout = null;
+let ajustesTabActual = 'roster';
+let pendienteAbierto = null; // { origenId, seccion, itemId }
+let pendienteModoEdicionPunto = false; // true = editando el motivo/campos originales del punto abierto
+let pendienteHistorialEditIdx = null; // índice de la actualización del historial en edición, o null
+
+// Roster por defecto (editable en Ajustes, persistido en localStorage)
+function getRoster(){
+  const raw = localStorage.getItem('minutas_roster');
+  if(raw){ try{ return JSON.parse(raw); }catch(e){} }
+  return [];
+}
+function setRoster(list){
+  localStorage.setItem('minutas_roster', JSON.stringify(list));
+}
+
+// ---------- Utilidades ----------
+function uid(){ return 'i-' + Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+function hoyISO(){ return new Date().toISOString().slice(0,10); }
+function formatearFechaLarga(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-').map(Number);
+  const fecha = new Date(y, m-1, d);
+  return fecha.toLocaleDateString('es-GT', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+}
+const MESES_ABREV = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+function dateTileHTML(iso){
+  if(!iso) return `<span class="day">—</span><span class="mon">· · ·</span>`;
+  const [y,m,d] = iso.split('-').map(Number);
+  return `<span class="day">${String(d).padStart(2,'0')}</span><span class="mon">${MESES_ABREV[m-1]}</span>`;
+}
+function toast(msg){
+  const root = document.getElementById('toast-root');
+  const el = document.createElement('div');
+  el.className = 'toast fade-in';
+  el.textContent = msg;
+  root.appendChild(el);
+  setTimeout(()=>{ el.remove(); }, 2600);
+}
+function escapeHTML(s){
+  return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Serializa un valor para insertarlo dentro de un atributo onclick='...' delimitado con comillas simples
+function jsAttr(v){
+  return JSON.stringify(v).replace(/'/g, "&#39;");
+}
+function nl2br(s){ return escapeHTML(s||'').replace(/\n/g,'<br>'); }
+
+// ---------- Editor de texto enriquecido (negrita, cursiva, subrayado, resaltado) ----------
+// Genera el HTML de un campo "detalle" con barra de herramientas, en reemplazo de un textarea plano.
+function rteHTML(id, placeholder, rows, valorInicial, onInputFn){
+  const minH = (rows || 3) * 22 + 14;
+  const oninputAttr = onInputFn ? ` oninput="${onInputFn}"` : '';
+  return `
+  <div class="rte-toolbar no-print">
+    <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteExec('${id}','bold')"><b>N</b></button>
+    <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteExec('${id}','italic')"><i>C</i></button>
+    <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteExec('${id}','underline')"><u>S</u></button>
+    <button type="button" class="rte-btn rte-btn-hl" onmousedown="event.preventDefault()" onclick="rteExec('${id}','hilite')">🖍️ Resaltar</button>
+    <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteExec('${id}','clear')">Quitar formato</button>
+  </div>
+  <div class="input rte-editable" id="${id}" contenteditable="true" spellcheck="true" lang="es" data-placeholder="${escapeHTML(placeholder||'')}" style="min-height:${minH}px;"${oninputAttr}>${detalleComoHTML(valorInicial||'')}</div>`;
+}
+
+function rteExec(id, cmd){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.focus();
+  try{
+    if(cmd === 'hilite') document.execCommand('hiliteColor', false, '#fde68a');
+    else if(cmd === 'clear') document.execCommand('removeFormat');
+    else document.execCommand(cmd);
+  }catch(e){ console.error(e); }
+}
+
+// Lee el valor de un editor enriquecido, ya sanitizado y listo para guardar
+function rteGetValue(id){
+  const el = document.getElementById(id);
+  if(!el) return '';
+  const html = el.innerHTML.trim();
+  if(!html || html === '<br>' || html === '<div><br></div>') return '';
+  return sanitizarHTML(html);
+}
+
+// Convierte texto plano antiguo (antes de este editor) a HTML seguro; si ya es HTML enriquecido, lo respeta tal cual
+function detalleComoHTML(raw){
+  if(!raw) return '';
+  if(/<(b|i|u|span|br|strong|em|div|ul|ol|li)[\s>]/i.test(raw)) return sanitizarHTML(raw);
+  return nl2br(raw);
+}
+
+// Convierte a texto plano (sin etiquetas) para búsquedas o comparaciones
+function textoPlano(html){
+  if(!html) return '';
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+}
+
+// Sanitiza HTML permitiendo solo etiquetas/estilos seguros de formato de texto (negrita, cursiva, subrayado, resaltado)
+function sanitizarHTML(html){
+  const permitido = { B:[], STRONG:[], I:[], EM:[], U:[], BR:[], DIV:[], P:[], SPAN:['style'], UL:[], OL:[], LI:[] };
+  const propiedadesEstiloOK = /^(background-color|color|font-weight|text-decoration|font-style)\s*:\s*[^;]+$/i;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+
+  (function limpiar(node){
+    Array.from(node.childNodes).forEach(child => {
+      if(child.nodeType === 1){
+        const tag = child.tagName;
+        if(!permitido[tag]){
+          while(child.firstChild) node.insertBefore(child.firstChild, child);
+          node.removeChild(child);
+          return;
+        }
+        Array.from(child.attributes).forEach(attr => {
+          if(!permitido[tag].includes(attr.name)){
+            child.removeAttribute(attr.name);
+          }else if(attr.name === 'style'){
+            const partes = attr.value.split(';').map(s => s.trim()).filter(p => p && propiedadesEstiloOK.test(p));
+            if(partes.length) child.setAttribute('style', partes.join('; '));
+            else child.removeAttribute('style');
+          }
+        });
+        limpiar(child);
+      }else if(child.nodeType !== 3){
+        node.removeChild(child);
+      }
+    });
+  })(tmp);
+
+  return tmp.innerHTML;
+}
+
+// ---------- Archivos adjuntos (Firebase Storage) ----------
+const ACCEPT_ADJUNTOS = 'image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx';
+const TAMANO_MAX_ADJUNTO = 20 * 1024 * 1024; // 20MB por archivo
+
+function iconoArchivo(nombre){
+  const ext = (nombre.split('.').pop() || '').toLowerCase();
+  if(['jpg','jpeg','png','gif','webp','heic','heif'].includes(ext)) return '🖼️';
+  if(ext === 'pdf') return '📕';
+  if(['doc','docx'].includes(ext)) return '📘';
+  if(['xls','xlsx','csv'].includes(ext)) return '📗';
+  if(['ppt','pptx'].includes(ext)) return '📙';
+  return '📎';
+}
+function formatearTamano(bytes){
+  if(!bytes) return '';
+  if(bytes < 1024*1024) return Math.round(bytes/1024) + ' KB';
+  return (bytes/(1024*1024)).toFixed(1) + ' MB';
+}
+
+// Sube uno o varios archivos a Storage y devuelve su metadata
+async function subirArchivosAdjuntos(seccion, itemId, files){
+  if(!files || files.length === 0) return [];
+  const resultados = [];
+  for(const file of files){
+    if(file.size > TAMANO_MAX_ADJUNTO){
+      toast(`"${file.name}" supera 20MB y no se subió.`);
+      continue;
+    }
+    const path = `adjuntos/${sesionActual.id}/${seccion}/${itemId}/${Date.now()}_${file.name}`;
+    try{
+      const ref = storage.ref(path);
+      await ref.put(file);
+      const url = await ref.getDownloadURL();
+      resultados.push({ nombre:file.name, url, path, tipo:file.type||'', tamano:file.size });
+    }catch(e){
+      console.error(e);
+      toast(`No se pudo subir "${file.name}". Revisa que Firebase Storage esté habilitado (plan Blaze) y sus reglas permitan escritura.`);
+    }
+  }
+  return resultados;
+}
+
+// Chip HTML de un archivo ya adjunto (modo lectura, con enlace para abrir/descargar)
+function chipArchivoHTML(a){
+  return `<a href="${a.url}" target="_blank" rel="noopener noreferrer" class="badge" style="background:var(--gold-pale);color:var(--navy);border:1px solid var(--gold-light);text-decoration:none;">
+    ${iconoArchivo(a.nombre)} ${escapeHTML(a.nombre)} ${a.tamano ? `<span style="color:var(--gray-400);">· ${formatearTamano(a.tamano)}</span>` : ''}
+  </a>`;
+}
+
+// Elimina un adjunto de un item que vive en la SESIÓN ACTUAL (Storage + arreglo local)
+async function eliminarArchivoDeItem(seccion, itemId, archivoIdx){
+  const item = (sesionActual[seccion]||[]).find(i => i.id === itemId);
+  if(!item || !item.archivos || !item.archivos[archivoIdx]) return;
+  if(!confirm(`¿Eliminar el archivo "${item.archivos[archivoIdx].nombre}"? Esta acción no se puede deshacer.`)) return;
+  const archivo = item.archivos[archivoIdx];
+  try{
+    if(archivo.path) await storage.ref(archivo.path).delete();
+  }catch(e){ console.error(e); /* si ya no existe en Storage, igual lo quitamos del registro */ }
+  item.archivos.splice(archivoIdx, 1);
+  renderListaItems(seccion);
+  programarGuardado();
+  toast('Archivo eliminado');
+}
+
+function cerrarModal(id){ document.getElementById(id).style.display = 'none'; }
+function abrirModalEl(id){ document.getElementById(id).style.display = 'flex'; }
+
+// ---------- Ciclo de vida de la app ----------
+function iniciarApp(){
+  renderRosterAjustes();
+  cargarUltimasSesiones().then(()=>{
+    // Si hay una sesión en borrador reciente, ofrecerla; si no, mostrar mensaje vacío.
+    const borrador = sesionesCache.find(s => s.estado === 'borrador');
+    if(borrador){ abrirSesion(borrador.id); }
+  });
+}
+
+async function cargarUltimasSesiones(){
+  const snap = await db.collection('sesiones').orderBy('fecha','desc').limit(40).get();
+  sesionesCache = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  return sesionesCache;
+}
+
+// ---------- Nueva sesión ----------
+function abrirModalNuevaSesion(){
+  document.getElementById('nm-fecha').value = hoyISO();
+  document.getElementById('nm-tipo').value = 'ordinaria';
+  document.getElementById('nm-lugar').value = 'Salón del Consejo Local';
+  document.getElementById('nm-moderador').value = localStorage.getItem('minutas_ultimo_moderador') || '';
+  document.getElementById('nm-secretario').value = localStorage.getItem('minutas_ultimo_secretario') || '';
+  abrirModalEl('modal-nueva');
+}
+
+async function crearNuevaSesion(){
+  const fecha = document.getElementById('nm-fecha').value;
+  if(!fecha){ toast('Ingresa una fecha'); return; }
+  const tipo = document.getElementById('nm-tipo').value;
+  const lugar = document.getElementById('nm-lugar').value;
+  const moderador = document.getElementById('nm-moderador').value;
+  const secretario = document.getElementById('nm-secretario').value;
+
+  localStorage.setItem('minutas_ultimo_moderador', moderador);
+  localStorage.setItem('minutas_ultimo_secretario', secretario);
+
+  const roster = getRoster();
+
+  const nuevaSesion = {
+    fecha, tipo, lugar, moderador, secretario,
+    horaInicio:'', horaFin:'',
+    estado:'borrador',
+    reflexion: { referencia:'', encargado:'', contenido:'' }, agenda: '',
+    correspondencias:[], audiencias:[], citados:[], informes:[], temas:[], acuerdos:[], seguimientos:[],
+    asistencia: roster.map(nombre => ({ nombre, presente:false })),
+    invitados: [],
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  let ref;
+  try{
+    ref = await db.collection('sesiones').add(nuevaSesion);
+  }catch(e){
+    console.error(e);
+    toast('No se pudo crear la sesión: sin conexión con Firestore. Intenta de nuevo en un momento.');
+    return;
+  }
+  cerrarModal('modal-nueva');
+  toast('Sesión creada — ' + formatearFechaLarga(fecha));
+  await cargarUltimasSesiones();
+  abrirSesion(ref.id);
+}
+
+// ---------- Abrir / cambiar de sesión ----------
+async function abrirSesion(id){
+  const doc = await db.collection('sesiones').doc(id).get();
+  if(!doc.exists){ toast('Esa sesión ya no existe'); return; }
+  sesionActual = { id: doc.id, ...doc.data() };
+  document.getElementById('no-session-msg').style.display = 'none';
+  document.getElementById('session-panels').style.display = 'block';
+  pintarDatosSesion();
+  cambiarPanel('datos');
+  cargarPendientesHeredados();
+  Object.keys(SECTIONS).forEach(renderSeccion);
+  renderAsistencia();
+  renderActa();
+  actualizarContadores();
+  marcarGuardado(true);
+}
+
+function pintarDatosSesion(){
+  const s = sesionActual;
+  document.getElementById('f-fecha').value = s.fecha || '';
+  document.getElementById('f-tipo').value = s.tipo || 'ordinaria';
+  document.getElementById('f-lugar').value = s.lugar || '';
+  document.getElementById('f-horaInicio').value = s.horaInicio || '';
+  document.getElementById('f-horaFin').value = s.horaFin || '';
+  document.getElementById('f-moderador').value = s.moderador || '';
+  document.getElementById('f-secretario').value = s.secretario || '';
+  document.getElementById('f-reflexion-encargado').value = (s.reflexion && s.reflexion.encargado) || '';
+  document.getElementById('f-reflexion-referencia').value = (s.reflexion && s.reflexion.referencia) || '';
+  document.getElementById('f-reflexion-contenido').innerHTML = detalleComoHTML((s.reflexion && s.reflexion.contenido) || '');
+  document.getElementById('f-agenda').innerHTML = detalleComoHTML(s.agenda || '');
+  document.getElementById('f-estado-display').textContent = s.estado === 'finalizada' ? 'Finalizada' : 'Borrador (en curso)';
+  document.getElementById('sidebar-fecha').textContent = s.fecha ? formatearFechaLarga(s.fecha) : 'Sin fecha';
+  document.getElementById('topbar-date').innerHTML = dateTileHTML(s.fecha);
+  document.getElementById('btn-finalizar').style.display = s.estado === 'finalizada' ? 'none' : 'block';
+  document.getElementById('btn-reabrir').style.display = s.estado === 'finalizada' ? 'block' : 'none';
+}
+
+function cambiarPanel(nombre){
+  panelActivo = nombre;
+  document.querySelectorAll('.section-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + nombre).classList.add('active');
+  document.querySelectorAll('.navlink').forEach(n => n.classList.toggle('active', n.dataset.panel === nombre));
+  if(nombre === 'acta') renderActa();
+}
+
+// ---------- Guardado (autosave con debounce, con reintento si se pierde la conexión) ----------
+let intentosFallidosGuardado = 0;
+
+function marcarGuardando(){
+  document.getElementById('save-dot').className = 'dot dot-saving';
+  document.getElementById('save-text').textContent = 'Guardando…';
+}
+function marcarGuardado(instant){
+  intentosFallidosGuardado = 0;
+  document.getElementById('save-dot').className = 'dot dot-saved';
+  document.getElementById('save-text').textContent = instant ? 'Sesión cargada' : 'Guardado';
+}
+function marcarSinConexion(){
+  document.getElementById('save-dot').className = 'dot dot-saving';
+  document.getElementById('save-dot').style.background = 'var(--danger)';
+  document.getElementById('save-text').textContent = 'Sin conexión — reintentando…';
+}
+
+function programarGuardado(){
+  if(!sesionActual) return;
+  marcarGuardando();
+  document.getElementById('save-dot').style.background = '';
+  clearTimeout(guardarTimeout);
+  guardarTimeout = setTimeout(guardarSesionActual, 900);
+}
+
+async function guardarSesionActual(){
+  if(!sesionActual) return;
+  const { id, ...datos } = sesionActual;
+  datos.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+  try{
+    await db.collection('sesiones').doc(id).set(datos, { merge:true });
+    marcarGuardado();
+  }catch(e){
+    console.error('Error al guardar la sesión:', e);
+    intentosFallidosGuardado++;
+    marcarSinConexion();
+    if(intentosFallidosGuardado === 1){
+      toast('Sin conexión con Firestore. Tus cambios se guardarán en cuanto vuelva la señal.');
+    }
+    // Reintenta automáticamente cada 6 segundos hasta lograr guardar
+    clearTimeout(guardarTimeout);
+    guardarTimeout = setTimeout(guardarSesionActual, 6000);
+  }
+}
+
+// Si el navegador detecta que se recuperó la conexión, reintenta guardar de inmediato
+window.addEventListener('online', () => {
+  if(sesionActual && intentosFallidosGuardado > 0){
+    toast('Conexión recuperada — guardando cambios pendientes…');
+    guardarSesionActual();
+  }
+});
+window.addEventListener('offline', () => {
+  if(sesionActual) marcarSinConexion();
+});
+
+function actualizarCampoSesion(campo, valor){
+  sesionActual[campo] = valor;
+  if(campo === 'fecha'){
+    document.getElementById('sidebar-fecha').textContent = formatearFechaLarga(valor);
+    document.getElementById('topbar-date').innerHTML = dateTileHTML(valor);
+  }
+  programarGuardado();
+}
+
+function actualizarCampoReflexion(campo, valor){
+  sesionActual.reflexion = sesionActual.reflexion || { referencia:'', encargado:'', contenido:'' };
+  sesionActual.reflexion[campo] = valor;
+  programarGuardado();
+}
+function guardarReflexionContenido(){
+  sesionActual.reflexion = sesionActual.reflexion || { referencia:'', encargado:'', contenido:'' };
+  sesionActual.reflexion.contenido = rteGetValue('f-reflexion-contenido');
+  programarGuardado();
+}
+function guardarAgenda(){
+  sesionActual.agenda = rteGetValue('f-agenda');
+  programarGuardado();
+}
+
+async function finalizarSesion(){
+  if(!confirm('¿Finalizar esta sesión? Podrás reabrirla después si necesitas corregir algo.')) return;
+  sesionActual.estado = 'finalizada';
+  if(!sesionActual.horaFin){
+    sesionActual.horaFin = new Date().toTimeString().slice(0,5);
+    document.getElementById('f-horaFin').value = sesionActual.horaFin;
+  }
+  await guardarSesionActual();
+  pintarDatosSesion();
+  Object.keys(SECTIONS).forEach(renderSeccion);
+  renderAsistencia();
+  toast('Sesión finalizada');
+}
+async function reabrirSesion(){
+  sesionActual.estado = 'borrador';
+  await guardarSesionActual();
+  pintarDatosSesion();
+  Object.keys(SECTIONS).forEach(renderSeccion);
+  renderAsistencia();
+  toast('Sesión reabierta para edición');
+}
+function eliminarSesionActual(){
+  if(!sesionActual) return;
+  eliminarSesion(sesionActual.id, sesionActual.fecha || '');
+}
+
+function actualizarContadores(){
+  Object.keys(SECTIONS).forEach(key => {
+    document.getElementById('cnt-' + key).textContent = (sesionActual[key] || []).length;
+  });
+  document.getElementById('cnt-asistencia').textContent =
+    (sesionActual.asistencia || []).filter(a => a.presente).length + '/' + (sesionActual.asistencia || []).length;
+}
+
+// ============================================================
+// MOTOR GENÉRICO DE SECCIONES (Correspondencias, Audiencias, Citados, Informes, Temas, Acuerdos)
+// ============================================================
+// ---------- Borradores sin guardar (protección contra cierre accidental) ----------
+// Mientras se escribe en el formulario de "agregar" de cada sección (antes de presionar el botón),
+// el contenido se guarda de forma automática en este navegador. Si la página se cierra o falla antes
+// de terminar de agregarlo, al volver a abrir la sesión se restaura lo que se llevaba escrito.
+let draftDebounceTimeouts = {};
+
+function claveDraft(seccion){
+  return sesionActual ? `minutas_draft_${sesionActual.id}_${seccion}` : null;
+}
+
+function guardarDraftSeccion(seccion){
+  const clave = claveDraft(seccion);
+  if(!clave) return;
+  const cfg = SECTIONS[seccion];
+  const draft = {};
+  cfg.fields.forEach(f => {
+    const el = document.getElementById(`new-${seccion}-${f.key}`);
+    if(el) draft[f.key] = el.value;
+  });
+  const detalleEl = document.getElementById(`new-${seccion}-detalle`);
+  if(detalleEl) draft.detalle = detalleEl.innerHTML;
+  const pendienteEl = document.getElementById(`new-${seccion}-pendiente`);
+  if(pendienteEl) draft.pendiente = pendienteEl.checked;
+
+  const hayTexto = Object.entries(draft).some(([k,v]) => k !== 'pendiente' && typeof v === 'string' && textoPlano(v).trim());
+  if(hayTexto){
+    try{ localStorage.setItem(clave, JSON.stringify(draft)); }catch(e){ /* almacenamiento lleno: se ignora */ }
+  }else{
+    localStorage.removeItem(clave);
+  }
+}
+
+function programarGuardadoDraft(seccion){
+  clearTimeout(draftDebounceTimeouts[seccion]);
+  draftDebounceTimeouts[seccion] = setTimeout(() => guardarDraftSeccion(seccion), 500);
+}
+
+function restaurarDraftSeccion(seccion){
+  const clave = claveDraft(seccion);
+  if(!clave) return;
+  const raw = localStorage.getItem(clave);
+  if(!raw) return;
+  let draft;
+  try{ draft = JSON.parse(raw); }catch(e){ localStorage.removeItem(clave); return; }
+
+  const cfg = SECTIONS[seccion];
+  let huboContenido = false;
+  cfg.fields.forEach(f => {
+    const el = document.getElementById(`new-${seccion}-${f.key}`);
+    if(el && draft[f.key]){ el.value = draft[f.key]; huboContenido = true; }
+  });
+  const detalleEl = document.getElementById(`new-${seccion}-detalle`);
+  if(detalleEl && draft.detalle && textoPlano(draft.detalle).trim()){ detalleEl.innerHTML = draft.detalle; huboContenido = true; }
+  const pendienteEl = document.getElementById(`new-${seccion}-pendiente`);
+  if(pendienteEl && draft.pendiente){ pendienteEl.checked = true; }
+
+  if(huboContenido){
+    toast(`Se recuperó un borrador sin guardar de "${cfg.label}"`);
+  }
+}
+
+function limpiarDraftSeccion(seccion){
+  const clave = claveDraft(seccion);
+  if(clave) localStorage.removeItem(clave);
+}
+
+function renderSeccion(key){
+  const cfg = SECTIONS[key];
+  const panel = document.getElementById('panel-' + key);
+  const items = sesionActual[key] || [];
+  const bloqueado = sesionActual.estado === 'finalizada';
+
+  let formFields = cfg.fields.map(f => campoHTML(key, f)).join('');
+
+  panel.innerHTML = `
+    <div class="card p-5 mb-4">
+      <h2 class="text-lg font-semibold serif mb-1" style="color:var(--ink)">${cfg.icon} ${cfg.label}</h2>
+      <p class="text-xs mb-4" style="color:var(--muted)">Campos rápidos para lo esencial, y un espacio de texto libre para el detalle completo.</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">${formFields}</div>
+      <div class="mt-3">
+        <label class="f-label">${cfg.detalleLabel}</label>
+        ${rteHTML(`new-${key}-detalle`, 'Describe con el detalle que necesites...', 3, '', `programarGuardadoDraft('${key}')`)}
+      </div>
+      ${cfg.adjuntos ? `
+      <div class="mt-3">
+        <label class="f-label">Archivos adjuntos (fotos, PDF, Word, Excel, PowerPoint)</label>
+        <input type="file" class="input" id="new-${key}-archivos" multiple accept="${ACCEPT_ADJUNTOS}">
+      </div>` : ''}
+      <label class="flex items-center gap-2 mt-3 text-sm" style="color:var(--text)">
+        <input type="checkbox" id="new-${key}-pendiente" style="width:16px;height:16px;" onchange="programarGuardadoDraft('${key}')">
+        Marcar para seguimiento en la próxima sesión (quedará como pendiente heredado)
+      </label>
+      <div class="flex justify-end mt-4">
+        <button class="btn btn-gold" onclick="agregarItem('${key}')" ${bloqueado ? 'disabled' : ''}>＋ Agregar ${cfg.label.toLowerCase()}</button>
+      </div>
+    </div>
+    <div id="lista-${key}"></div>
+  `;
+  renderListaItems(key);
+  restaurarDraftSeccion(key);
+}
+
+function campoHTML(seccion, f){
+  const id = `new-${seccion}-${f.key}`;
+  if(f.type === 'select'){
+    const opts = f.options.map(o => `<option value="${o}">${o}</option>`).join('');
+    return `<div><label class="f-label">${f.label}</label><select class="input" id="${id}" onchange="programarGuardadoDraft('${seccion}')"><option value="">—</option>${opts}</select></div>`;
+  }
+  const spellAttrs = f.type === 'text' ? ' spellcheck="true" lang="es"' : '';
+  return `<div><label class="f-label">${f.label}${f.required?' *':''}</label><input class="input" type="${f.type}" id="${id}" placeholder="${f.placeholder||''}" oninput="programarGuardadoDraft('${seccion}')"${spellAttrs}></div>`;
+}
+
+async function agregarItem(seccion){
+  const cfg = SECTIONS[seccion];
+  const item = { id: uid(), detalle:'', pendiente:false, resuelto:false, historial:[] };
+  let faltaRequerido = false;
+
+  cfg.fields.forEach(f => {
+    const el = document.getElementById(`new-${seccion}-${f.key}`);
+    const val = el.value.trim();
+    if(f.required && !val) faltaRequerido = true;
+    item[f.key] = val;
+  });
+  if(faltaRequerido){ toast('Completa el campo obligatorio'); return; }
+
+  item.detalle = rteGetValue(`new-${seccion}-detalle`);
+  item.pendiente = document.getElementById(`new-${seccion}-pendiente`).checked;
+
+  if(cfg.conVotacion) item.votacion = null;
+  if(cfg.adjuntos) item.archivos = [];
+
+  sesionActual[seccion] = sesionActual[seccion] || [];
+  sesionActual[seccion].push(item);
+
+  // capturar archivos seleccionados antes de limpiar el formulario
+  let archivosSeleccionados = [];
+  let fileInputEl = null;
+  if(cfg.adjuntos){
+    fileInputEl = document.getElementById(`new-${seccion}-archivos`);
+    if(fileInputEl && fileInputEl.files.length) archivosSeleccionados = Array.from(fileInputEl.files);
+  }
+
+  // limpiar formulario
+  cfg.fields.forEach(f => { document.getElementById(`new-${seccion}-${f.key}`).value = ''; });
+  document.getElementById(`new-${seccion}-detalle`).innerHTML = '';
+  document.getElementById(`new-${seccion}-pendiente`).checked = false;
+  if(fileInputEl) fileInputEl.value = '';
+  limpiarDraftSeccion(seccion);
+
+  renderListaItems(seccion);
+  actualizarContadores();
+  programarGuardado();
+
+  if(archivosSeleccionados.length){
+    toast('Subiendo archivo(s) adjunto(s)…');
+    item.archivos = await subirArchivosAdjuntos(seccion, item.id, archivosSeleccionados);
+    renderListaItems(seccion);
+    programarGuardado();
+  }
+}
+
+function badgeDecision(valor){
+  if(!valor) return '';
+  const slug = DECISION_SLUG(valor);
+  return `<span class="badge badge-${slug}">${valor}</span>`;
+}
+
+let itemEnEdicion = null; // { seccion, itemId }
+
+function renderListaItems(seccion){
+  const cfg = SECTIONS[seccion];
+  const items = sesionActual[seccion] || [];
+  const cont = document.getElementById('lista-' + seccion);
+  const bloqueado = sesionActual.estado === 'finalizada';
+
+  if(items.length === 0){
+    cont.innerHTML = `<p class="text-sm text-center py-6" style="color:var(--muted)">Todavía no hay elementos registrados en esta sección.</p>`;
+    return;
+  }
+
+  cont.innerHTML = items.map((item, idx) => {
+    const enEdicion = itemEnEdicion && itemEnEdicion.seccion === seccion && itemEnEdicion.itemId === item.id;
+    if(enEdicion) return renderFormularioEdicion(seccion, item, idx, cfg);
+
+    const titulo = item[cfg.tituloCampo] || '(sin título)';
+    const decisionKey = cfg.fields.find(f => ['decision','resultado','estado'].includes(f.key));
+    const decisionVal = decisionKey ? item[decisionKey.key] : '';
+    const subcampos = cfg.fields.filter(f => f.key !== cfg.tituloCampo && f.key !== (decisionKey?decisionKey.key:''))
+      .map(f => item[f.key] ? `<span class="mono" style="color:var(--muted)">${f.label}: <b style="color:var(--text)">${escapeHTML(item[f.key])}</b></span>` : '').filter(Boolean).join(' &nbsp;·&nbsp; ');
+
+    const notaTag = cfg.numerado ? `<span class="nota-tag">Nota N.º ${idx+1}</span>` : '';
+    const votacionHTML = cfg.conVotacion ? renderVotacionBloque(seccion, item) : '';
+    const archivosHTML = (cfg.adjuntos && item.archivos && item.archivos.length)
+      ? `<div class="flex flex-wrap gap-2 mt-2">${item.archivos.map(chipArchivoHTML).join('')}</div>`
+      : '';
+
+    return `
+    <div class="item-card fade-in">
+      <div class="flex items-start gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap mb-1">
+            ${notaTag}
+            <h3 class="font-semibold text-sm" style="color:var(--ink)">${escapeHTML(titulo)}</h3>
+            ${badgeDecision(decisionVal)}
+            ${item.pendiente && !item.resuelto ? '<span class="badge badge-pendiente">📌 Seguimiento próxima sesión</span>' : ''}
+          </div>
+          ${subcampos ? `<p class="text-xs mb-1">${subcampos}</p>` : ''}
+          ${item.detalle ? `<p class="text-sm mt-1 leading-relaxed rte-content" style="color:var(--text)">${detalleComoHTML(item.detalle)}</p>` : ''}
+          ${votacionHTML}
+          ${archivosHTML}
+        </div>
+        <div class="flex flex-col gap-1 shrink-0">
+          <button class="btn btn-ghost btn-sm" onclick="editarDetalleItem('${seccion}','${item.id}')" ${bloqueado?'disabled':''}>✎ Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="eliminarItem('${seccion}','${item.id}')" ${bloqueado?'disabled':''}>🗑</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Renderiza el registro reabierto para edición completa (reemplaza el cuadro flotante anterior)
+function renderFormularioEdicion(seccion, item, idx, cfg){
+  const notaTag = cfg.numerado ? `<span class="nota-tag">Nota N.º ${idx+1}</span>` : '';
+  const camposHTML = cfg.fields.map(f => {
+    const valorActual = item[f.key] || '';
+    const id = `edit-${seccion}-${item.id}-${f.key}`;
+    if(f.type === 'select'){
+      const opts = f.options.map(o => `<option value="${o}" ${o===valorActual?'selected':''}>${o}</option>`).join('');
+      return `<div><label class="f-label">${f.label}</label><select class="input" id="${id}"><option value="">—</option>${opts}</select></div>`;
+    }
+    return `<div><label class="f-label">${f.label}${f.required?' *':''}</label><input class="input" type="${f.type}" id="${id}" value="${escapeHTML(valorActual)}"></div>`;
+  }).join('');
+
+  return `
+  <div class="item-card fade-in" style="border-color:rgba(124,92,255,0.5);box-shadow:0 0 0 1px rgba(124,92,255,0.2) inset;">
+    <div class="flex items-center gap-2 mb-3">
+      ${notaTag}
+      <p class="text-xs font-semibold uppercase" style="color:var(--ink-2);letter-spacing:.06em;">Editando registro</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">${camposHTML}</div>
+    <div class="mt-3">
+      <label class="f-label">${cfg.detalleLabel}</label>
+      ${rteHTML(`edit-${seccion}-${item.id}-detalle`, '', 3, item.detalle)}
+    </div>
+    ${cfg.adjuntos ? `
+    <div class="mt-3">
+      <label class="f-label">Archivos adjuntos</label>
+      <div class="flex flex-wrap gap-2 mb-2">
+        ${(item.archivos||[]).map((a, ai) => `
+          <span class="badge" style="background:var(--gold-pale);color:var(--navy);border:1px solid var(--gold-light);">
+            ${iconoArchivo(a.nombre)} ${escapeHTML(a.nombre)}
+            <button type="button" onclick="eliminarArchivoDeItem('${seccion}','${item.id}',${ai})" style="border:none;background:none;color:var(--rust);cursor:pointer;margin-left:4px;font-weight:700;">✕</button>
+          </span>`).join('') || `<span class="text-xs" style="color:var(--muted)">Sin adjuntos todavía</span>`}
+      </div>
+      <input type="file" class="input" id="edit-${seccion}-${item.id}-archivos-nuevos" multiple accept="${ACCEPT_ADJUNTOS}">
+      <p class="text-xs mt-1" style="color:var(--muted)">Selecciona archivos para agregarlos a los ya adjuntos.</p>
+    </div>` : ''}
+    <label class="flex items-center gap-2 mt-3 text-sm" style="color:var(--text)">
+      <input type="checkbox" id="edit-${seccion}-${item.id}-pendiente" ${item.pendiente && !item.resuelto ? 'checked' : ''} style="width:16px;height:16px;">
+      Marcar para seguimiento en la próxima sesión
+    </label>
+    ${item.resuelto ? `<p class="text-xs mt-2" style="color:var(--sage);">Este pendiente ya fue resuelto el ${item.historial && item.historial.length ? item.historial[item.historial.length-1].fecha : ''}. Cambiar la casilla de arriba no reabre el pendiente automáticamente.</p>` : ''}
+    <div class="flex justify-end gap-2 mt-4">
+      <button class="btn btn-ghost btn-sm" onclick="cancelarEdicionItem('${seccion}')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="guardarEdicionItem('${seccion}','${item.id}')">Guardar cambios</button>
+    </div>
+  </div>`;
+}
+
+function editarDetalleItem(seccion, itemId){
+  itemEnEdicion = { seccion, itemId };
+  renderListaItems(seccion);
+}
+
+function cancelarEdicionItem(seccion){
+  itemEnEdicion = null;
+  renderListaItems(seccion);
+}
+
+async function guardarEdicionItem(seccion, itemId){
+  const cfg = SECTIONS[seccion];
+  const item = (sesionActual[seccion]||[]).find(i => i.id === itemId);
+  if(!item) return;
+
+  let faltaRequerido = false;
+  cfg.fields.forEach(f => {
+    const el = document.getElementById(`edit-${seccion}-${itemId}-${f.key}`);
+    const val = el.value.trim();
+    if(f.required && !val) faltaRequerido = true;
+    item[f.key] = val;
+  });
+  if(faltaRequerido){ toast('Completa el campo obligatorio'); return; }
+
+  item.detalle = rteGetValue(`edit-${seccion}-${itemId}-detalle`);
+  item.pendiente = document.getElementById(`edit-${seccion}-${itemId}-pendiente`).checked;
+
+  let archivosNuevos = [];
+  if(cfg.adjuntos){
+    const fileInputEl = document.getElementById(`edit-${seccion}-${itemId}-archivos-nuevos`);
+    if(fileInputEl && fileInputEl.files.length) archivosNuevos = Array.from(fileInputEl.files);
+  }
+
+  itemEnEdicion = null;
+  renderListaItems(seccion);
+  actualizarContadores();
+  programarGuardado();
+  toast('Cambios guardados');
+
+  if(archivosNuevos.length){
+    toast('Subiendo archivo(s) adjunto(s)…');
+    const subidos = await subirArchivosAdjuntos(seccion, itemId, archivosNuevos);
+    item.archivos = (item.archivos||[]).concat(subidos);
+    renderListaItems(seccion);
+    programarGuardado();
+  }
+}
+
+function eliminarItem(seccion, itemId){
+  if(!confirm('¿Eliminar este elemento? Esta acción no se puede deshacer.')) return;
+  sesionActual[seccion] = (sesionActual[seccion]||[]).filter(i => i.id !== itemId);
+  renderListaItems(seccion);
+  actualizarContadores();
+  programarGuardado();
+}
+
+// ---------- Votación (solo para Temas a tratar) ----------
+function renderVotacionBloque(seccion, item){
+  const bloqueado = sesionActual.estado === 'finalizada';
+  if(!item.votacion){
+    return `<button class="btn btn-ghost btn-sm mt-2" onclick="agregarVotacion('${seccion}','${item.id}')" ${bloqueado?'disabled':''}>🗳️ Registrar votación</button>`;
+  }
+  const props = item.votacion.propuestas || [];
+  const max = Math.max(...props.map(p => p.votos||0), 0);
+  const filas = props.map(p => `
+    <div class="flex items-center justify-between text-xs py-0.5">
+      <span>${escapeHTML(p.texto)} ${p.votos===max && max>0 ? '<b style="color:var(--sage)">✓ Ganadora</b>':''}</span>
+      <span class="mono">${p.votos} voto(s)</span>
+    </div>`).join('');
+  return `<div class="mt-2 p-2 rounded-lg" style="background:var(--paper-2);">
+      <p class="text-xs font-semibold mb-1" style="color:var(--ink)">Votación registrada</p>
+      ${filas}
+    </div>`;
+}
+
+function agregarVotacion(seccion, itemId){
+  const item = (sesionActual[seccion]||[]).find(i => i.id === itemId);
+  if(!item) return;
+  const n = parseInt(prompt('¿Cuántas propuestas se sometieron a votación?','2'), 10);
+  if(!n || n < 1) return;
+  const propuestas = [];
+  for(let i=1;i<=n;i++){
+    const texto = prompt(`Propuesta ${i} — texto:`);
+    if(texto === null) return;
+    const votos = parseInt(prompt(`Propuesta ${i} — votos a favor:`,'0'), 10) || 0;
+    propuestas.push({ texto, votos });
+  }
+  item.votacion = { propuestas };
+  renderListaItems(seccion);
+  programarGuardado();
+}
+
+// ============================================================
+// PENDIENTES HEREDADOS (control cruzado entre sesiones)
+// ============================================================
+// Calcula cuántos días lleva abierto un punto pendiente, para estimar prioridad
+function diasEntre(fechaISO){
+  if(!fechaISO) return null;
+  const [y,m,d] = fechaISO.split('-').map(Number);
+  const origen = new Date(y, m-1, d); origen.setHours(0,0,0,0);
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  return Math.round((hoy - origen) / 86400000);
+}
+function prioridadPorDias(dias){
+  if(dias === null) return { label:'—', color:'#4b5563', bg:'#f3f4f6' };
+  if(dias >= 30) return { label:'Alta', color:'#991b1b', bg:'#fee2e2' };
+  if(dias >= 14) return { label:'Media', color:'#9a3412', bg:'#ffedd5' };
+  return { label:'Reciente', color:'#166534', bg:'#dcfce7' };
+}
+
+// Genera un informe imprimible con TODOS los puntos pendientes (de todas las sesiones, no solo las últimas 40)
+// para entregar a la mesa directiva y evaluar prioridades.
+async function generarInformePendientes(){
+  toast('Generando informe…');
+  let snap;
+  try{
+    snap = await db.collection('sesiones').orderBy('fecha','desc').get();
+  }catch(e){
+    console.error(e);
+    toast('No se pudo generar el informe: sin conexión con Firestore. Intenta de nuevo en un momento.');
+    return;
+  }
+
+  const abiertos = [];
+  snap.docs.forEach(d => {
+    const s = d.data();
+    Object.keys(SECTIONS).forEach(seccion => {
+      (s[seccion]||[]).forEach(item => {
+        if(item.pendiente && !item.resuelto){
+          abiertos.push({ origenFecha:s.fecha, seccion, item, dias: diasEntre(s.fecha) });
+        }
+      });
+    });
+  });
+  abiertos.sort((a,b) => (b.dias||0) - (a.dias||0)); // más antiguo (mayor prioridad) primero
+
+  const filasHTML = abiertos.map(p => {
+    const cfg = SECTIONS[p.seccion];
+    const titulo = p.item[cfg.tituloCampo] || '(sin título)';
+    const prio = prioridadPorDias(p.dias);
+    const ultimaNota = (p.item.historial && p.item.historial.length) ? p.item.historial[p.item.historial.length-1].nota : '';
+    return `
+      <tr>
+        <td style="padding:10px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap;">
+          <span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 9px;border-radius:999px;background:${prio.bg};color:${prio.color};text-transform:uppercase;letter-spacing:.03em;">${prio.label}</span>
+        </td>
+        <td style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#4b5563;white-space:nowrap;">${cfg.icon} ${cfg.label}</td>
+        <td style="padding:10px 8px;border-bottom:1px solid #e5e7eb;">
+          <div style="font-weight:600;color:#1a2744;font-size:13px;">${escapeHTML(titulo)}</div>
+          ${p.item.detalle ? `<div style="font-size:12px;color:#4b5563;margin-top:2px;" class="rte-content">${detalleComoHTML(p.item.detalle)}</div>` : ''}
+          ${ultimaNota ? `<div style="font-size:11.5px;color:#9a3412;margin-top:4px;" class="rte-content"><b>Última actualización:</b> ${detalleComoHTML(ultimaNota)}</div>` : ''}
+        </td>
+        <td style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#4b5563;white-space:nowrap;">${formatearFechaLarga(p.origenFecha) || '—'}</td>
+        <td style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#4b5563;text-align:center;white-space:nowrap;">${p.dias !== null ? p.dias + ' días' : '—'}</td>
+      </tr>`;
+  }).join('');
+
+  const hoyTexto = new Date().toLocaleDateString('es-GT', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+  const totalAlta = abiertos.filter(p => (p.dias||0) >= 30).length;
+  const totalMedia = abiertos.filter(p => (p.dias||0) >= 14 && (p.dias||0) < 30).length;
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Informe de Puntos Pendientes — Consejo Local</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap');
+  *{box-sizing:border-box;}
+  body{font-family:'Inter',sans-serif;color:#1f2937;margin:0;padding:36px;background:#fff;}
+  h1{font-family:'Playfair Display',serif;color:#1a2744;font-size:21px;margin:0 0 2px;}
+  .sub{color:#9ca3af;font-size:12px;margin:0 0 22px;}
+  table{width:100%;border-collapse:collapse;}
+  th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;padding:0 8px 8px;border-bottom:2px solid #1a2744;}
+  .resumen{display:flex;gap:14px;margin:16px 0 26px;}
+  .resumen div{border:1px solid #e5e7eb;border-radius:10px;padding:10px 18px;text-align:center;min-width:100px;}
+  .resumen b{display:block;font-size:22px;color:#1a2744;font-family:'Playfair Display',serif;}
+  .resumen span{font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;}
+  .firma{display:flex;justify-content:space-between;margin-top:60px;}
+  .firma div{text-align:center;width:42%;border-top:1px solid #1f2937;padding-top:6px;font-size:11px;color:#4b5563;}
+  .rte-content{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .rte-content b, .rte-content strong{font-weight:700;}
+  .rte-content u{text-decoration:underline;}
+  @media print{ body{padding:18px;} }
+</style></head><body>
+  <h1>Informe de Puntos Pendientes</h1>
+  <p class="sub">Iglesia Evangélica Centroamericana "Salem" · Consejo Local, Patzún, Chimaltenango — Generado el ${hoyTexto}</p>
+  <div class="resumen">
+    <div><b>${abiertos.length}</b><span>Total pendientes</span></div>
+    <div><b>${totalAlta}</b><span>Prioridad alta (30+ días)</span></div>
+    <div><b>${totalMedia}</b><span>Prioridad media (14-29 días)</span></div>
+  </div>
+  <table>
+    <thead><tr><th>Prioridad</th><th>Sección</th><th>Punto</th><th>Origen</th><th>Días abierto</th></tr></thead>
+    <tbody>${filasHTML || '<tr><td colspan="5" style="padding:24px;text-align:center;color:#9ca3af;">No hay puntos pendientes registrados. ✅</td></tr>'}</tbody>
+  </table>
+  <div class="firma">
+    <div>Secretario(a)</div>
+    <div>Mesa Directiva</div>
+  </div>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  if(!w){
+    toast('El navegador bloqueó la ventana emergente. Habilítala para este sitio e inténtalo de nuevo.');
+    return;
+  }
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { w.print(); }, 500);
+}
+
+
+async function cargarPendientesHeredados(forzar){
+  if(forzar) await cargarUltimasSesiones();
+  const cont = document.getElementById('lista-pendientes');
+  const abiertos = [];
+
+  sesionesCache.forEach(s => {
+    if(s.id === sesionActual.id) return;
+    Object.keys(SECTIONS).forEach(seccion => {
+      (s[seccion]||[]).forEach(item => {
+        if(item.pendiente && !item.resuelto){
+          abiertos.push({ origenId:s.id, origenFecha:s.fecha, seccion, item });
+        }
+      });
+    });
+  });
+
+  document.getElementById('cnt-pendientes').textContent = abiertos.length;
+
+  if(abiertos.length === 0){
+    cont.innerHTML = `<div class="card p-6 text-center"><p class="text-sm" style="color:var(--muted)">No hay pendientes heredados. Todo al día. ✅</p></div>`;
+    return;
+  }
+
+  abiertos.sort((a,b) => (a.origenFecha < b.origenFecha ? 1 : -1));
+
+  cont.innerHTML = abiertos.map(p => {
+    const cfg = SECTIONS[p.seccion];
+    const titulo = p.item[cfg.tituloCampo] || '(sin título)';
+    const estaAbierto = pendienteAbierto && pendienteAbierto.origenId === p.origenId && pendienteAbierto.seccion === p.seccion && pendienteAbierto.itemId === p.item.id;
+
+    if(estaAbierto) return renderSeguimientoPendienteAbierto(p, cfg, titulo);
+
+    return `
+    <div class="item-card fade-in" style="cursor:pointer;" onclick="abrirSeguimientoPendiente('${p.origenId}','${p.seccion}','${p.item.id}')">
+      <div class="flex items-start gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap mb-1">
+            <span class="badge badge-pendiente">${cfg.icon} ${cfg.label}</span>
+            <span class="mono text-xs" style="color:var(--muted)">Origen: ${formatearFechaLarga(p.origenFecha)}</span>
+            ${p.item.historial && p.item.historial.length ? `<span class="mono text-xs" style="color:var(--muted)">· ${p.item.historial.length} actualización(es)</span>` : ''}
+          </div>
+          <h3 class="font-semibold text-sm" style="color:var(--ink)">${escapeHTML(titulo)}</h3>
+          ${p.item.detalle ? `<p class="text-sm mt-1 rte-content" style="color:var(--text)">${detalleComoHTML(p.item.detalle)}</p>` : ''}
+        </div>
+        <button class="btn btn-primary btn-sm shrink-0" onclick="event.stopPropagation(); abrirSeguimientoPendiente('${p.origenId}','${p.seccion}','${p.item.id}')">Dar seguimiento</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Reabre el punto pendiente para actualizar su caso y estado, con línea de tiempo de avances editable
+function renderSeguimientoPendienteAbierto(p, cfg, titulo){
+  const historial = p.item.historial || [];
+
+  // Modo: editar el punto principal (motivo/campos originales)
+  if(pendienteModoEdicionPunto){
+    const camposHTML = cfg.fields.map(f => {
+      const valorActual = p.item[f.key] || '';
+      const id = `pend-edit-${f.key}`;
+      if(f.type === 'select'){
+        const opts = f.options.map(o => `<option value="${o}" ${o===valorActual?'selected':''}>${o}</option>`).join('');
+        return `<div><label class="f-label">${f.label}</label><select class="input" id="${id}"><option value="">—</option>${opts}</select></div>`;
+      }
+      return `<div><label class="f-label">${f.label}${f.required?' *':''}</label><input class="input" type="${f.type}" id="${id}" value="${escapeHTML(valorActual)}"></div>`;
+    }).join('');
+
+    return `
+    <div class="item-card fade-in" style="border-color:var(--gold);box-shadow:0 0 0 1px rgba(201,168,76,0.25) inset;">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge badge-pendiente">${cfg.icon} ${cfg.label}</span>
+        <p class="text-xs font-semibold uppercase" style="color:var(--ink-2);letter-spacing:.06em;">Editando el punto original</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">${camposHTML}</div>
+      <div class="mt-3">
+        <label class="f-label">${cfg.detalleLabel}</label>
+        ${rteHTML('pend-edit-detalle', '', 3, p.item.detalle)}
+      </div>
+      <div class="flex justify-end gap-2 mt-4">
+        <button class="btn btn-ghost btn-sm" onclick="pendienteModoEdicionPunto=false; cargarPendientesHeredados(false);">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="guardarEdicionPuntoPendiente('${p.origenId}','${p.seccion}','${p.item.id}')">Guardar cambios del punto</button>
+      </div>
+    </div>`;
+  }
+
+  const timelineHTML = historial.length
+    ? historial.slice().reverse().map((h, revIdx) => {
+        const idxReal = historial.length - 1 - revIdx; // índice real en el arreglo (sin invertir)
+        if(pendienteHistorialEditIdx === idxReal){
+          return `
+          <div style="padding:8px 0;border-bottom:1px solid var(--line);">
+            <span class="mono text-xs" style="color:var(--muted);">${formatearFechaLarga(h.fecha) || h.fecha}</span>
+            ${rteHTML('hist-edit-nota', '', 2, h.nota)}
+            <div class="flex justify-end gap-2 mt-1">
+              <button class="btn btn-ghost btn-sm" onclick="pendienteHistorialEditIdx=null; cargarPendientesHeredados(false);">Cancelar</button>
+              <button class="btn btn-primary btn-sm" onclick="guardarEdicionHistorial('${p.origenId}','${p.seccion}','${p.item.id}',${idxReal})">Guardar</button>
+            </div>
+          </div>`;
+        }
+        return `
+        <div class="flex items-start gap-2 text-xs" style="padding:6px 0;border-bottom:1px solid var(--line);">
+          <span class="mono shrink-0" style="color:var(--muted);min-width:90px;">${formatearFechaLarga(h.fecha) || h.fecha}</span>
+          <span style="color:var(--text);flex:1;" class="rte-content">${detalleComoHTML(h.nota)}</span>
+          <button class="btn btn-ghost btn-sm shrink-0" style="padding:2px 7px;" onclick="pendienteHistorialEditIdx=${idxReal}; cargarPendientesHeredados(false);">✎</button>
+          <button class="btn btn-danger btn-sm shrink-0" style="padding:2px 7px;" onclick="eliminarEntradaHistorial('${p.origenId}','${p.seccion}','${p.item.id}',${idxReal})">🗑</button>
+        </div>`;
+      }).join('')
+    : `<p class="text-xs" style="color:var(--muted);">Todavía no hay actualizaciones registradas para este punto.</p>`;
+
+  return `
+  <div class="item-card fade-in" style="border-color:var(--gold);box-shadow:0 0 0 1px rgba(201,168,76,0.25) inset;">
+    <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="badge badge-pendiente">${cfg.icon} ${cfg.label}</span>
+        <span class="mono text-xs" style="color:var(--muted)">Origen: ${formatearFechaLarga(p.origenFecha)}</span>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button class="btn btn-ghost btn-sm" onclick="pendienteModoEdicionPunto=true; cargarPendientesHeredados(false);">✎ Editar motivo del punto</button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarPuntoPendienteCompleto('${p.origenId}','${p.seccion}','${p.item.id}', ${jsAttr(titulo)})">🗑 Eliminar este punto</button>
+      </div>
+    </div>
+    <h3 class="font-semibold text-sm mb-1" style="color:var(--ink)">${escapeHTML(titulo)}</h3>
+    ${p.item.detalle ? `<p class="text-sm mb-3 rte-content" style="color:var(--text)">${detalleComoHTML(p.item.detalle)}</p>` : ''}
+
+    <p class="text-xs font-semibold uppercase mb-1" style="color:var(--ink-2);letter-spacing:.06em;">Línea de tiempo de seguimiento</p>
+    <div class="mb-3" style="max-height:220px;overflow-y:auto;">${timelineHTML}</div>
+
+    <label class="f-label">Actualización de esta sesión</label>
+    ${rteHTML('seg-nota', '¿Qué avance hubo con este caso en la sesión de hoy?', 3)}
+
+    <label class="f-label mt-3" style="display:block;">Estado del punto</label>
+    <div class="flex gap-4 mb-1">
+      <label class="flex items-center gap-2 text-sm" style="color:var(--text)">
+        <input type="radio" name="seg-estado" value="pendiente" checked style="width:15px;height:15px;"> Sigue pendiente
+      </label>
+      <label class="flex items-center gap-2 text-sm" style="color:var(--text)">
+        <input type="radio" name="seg-estado" value="resuelto" style="width:15px;height:15px;"> Dar por finalizado (resuelto)
+      </label>
+    </div>
+
+    <div class="flex justify-end gap-2 mt-4">
+      <button class="btn btn-ghost btn-sm" onclick="cerrarSeguimientoPendiente()">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="guardarSeguimientoPendiente('${p.origenId}','${p.seccion}','${p.item.id}')">Guardar actualización</button>
+    </div>
+  </div>`;
+}
+
+function abrirSeguimientoPendiente(origenId, seccion, itemId){
+  pendienteAbierto = { origenId, seccion, itemId };
+  pendienteModoEdicionPunto = false;
+  pendienteHistorialEditIdx = null;
+  cargarPendientesHeredados(false);
+}
+
+function cerrarSeguimientoPendiente(){
+  pendienteAbierto = null;
+  pendienteModoEdicionPunto = false;
+  pendienteHistorialEditIdx = null;
+  cargarPendientesHeredados(false);
+}
+
+// Guarda cambios al motivo/campos originales del punto pendiente (vive en la sesión de origen)
+async function guardarEdicionPuntoPendiente(origenId, seccion, itemId){
+  const cfg = SECTIONS[seccion];
+  const ref = db.collection('sesiones').doc(origenId);
+  const doc = await ref.get();
+  if(!doc.exists){ toast('La sesión de origen ya no existe'); pendienteAbierto = null; cargarPendientesHeredados(true); return; }
+  const data = doc.data();
+  const arr = data[seccion] || [];
+  const idx = arr.findIndex(i => i.id === itemId);
+  if(idx === -1){ toast('El punto ya no existe'); pendienteAbierto = null; cargarPendientesHeredados(true); return; }
+
+  let faltaRequerido = false;
+  cfg.fields.forEach(f => {
+    const el = document.getElementById(`pend-edit-${f.key}`);
+    const val = el.value.trim();
+    if(f.required && !val) faltaRequerido = true;
+    arr[idx][f.key] = val;
+  });
+  if(faltaRequerido){ toast('Completa el campo obligatorio'); return; }
+  arr[idx].detalle = rteGetValue('pend-edit-detalle');
+
+  try{
+    await ref.update({ [seccion]: arr });
+  }catch(e){
+    console.error(e); toast('No se pudo guardar: sin conexión con Firestore. Intenta de nuevo en un momento.'); return;
+  }
+  const cacheDoc = sesionesCache.find(s => s.id === origenId);
+  if(cacheDoc) cacheDoc[seccion] = arr;
+
+  pendienteModoEdicionPunto = false;
+  toast('Punto pendiente actualizado');
+  cargarPendientesHeredados(false);
+}
+
+// Guarda la corrección de una actualización ya registrada en la línea de tiempo
+// Cuando se edita o elimina una actualización del historial, su copia registrada en el acta de la
+// sesión donde se hizo el seguimiento (sesionActual.seguimientos) puede quedar desactualizada porque
+// vive en otro documento. Esta función la busca en TODAS las sesiones y la actualiza o elimina también.
+async function sincronizarSeguimientosTrasEdicionHistorial(historialEntryId, nuevaNotaONull){
+  if(!historialEntryId) return; // entradas antiguas sin id: no se puede rastrear, se omite
+  let snap;
+  try{
+    snap = await db.collection('sesiones').orderBy('fecha','desc').get();
+  }catch(e){
+    console.error(e);
+    return;
+  }
+  for(const docSnap of snap.docs){
+    const data = docSnap.data();
+    const segs = data.seguimientos || [];
+    const idx = segs.findIndex(sg => sg.historialEntryId === historialEntryId);
+    if(idx === -1) continue;
+
+    const nuevosSegs = nuevaNotaONull === null
+      ? segs.filter((_, i) => i !== idx)
+      : segs.map((sg, i) => i === idx ? { ...sg, nota: nuevaNotaONull } : sg);
+
+    try{
+      await db.collection('sesiones').doc(docSnap.id).update({ seguimientos: nuevosSegs });
+    }catch(e){
+      console.error(e);
+      continue;
+    }
+
+    // Si es la sesión actualmente abierta, reflejar el cambio de inmediato en la vista de acta
+    if(sesionActual && sesionActual.id === docSnap.id){
+      sesionActual.seguimientos = nuevosSegs;
+      renderActa();
+    }
+    const cacheDoc = sesionesCache.find(s => s.id === docSnap.id);
+    if(cacheDoc) cacheDoc.seguimientos = nuevosSegs;
+    break; // una entrada de historial solo debería estar registrada en una sesión
+  }
+}
+
+async function guardarEdicionHistorial(origenId, seccion, itemId, historialIdx){
+  const nuevaNota = rteGetValue('hist-edit-nota');
+  if(!nuevaNota){ toast('La actualización no puede quedar vacía'); return; }
+
+  const ref = db.collection('sesiones').doc(origenId);
+  const doc = await ref.get();
+  if(!doc.exists){ toast('La sesión de origen ya no existe'); pendienteAbierto = null; cargarPendientesHeredados(true); return; }
+  const data = doc.data();
+  const arr = data[seccion] || [];
+  const idx = arr.findIndex(i => i.id === itemId);
+  if(idx === -1 || !arr[idx].historial || !arr[idx].historial[historialIdx]){ toast('La actualización ya no existe'); pendienteHistorialEditIdx = null; cargarPendientesHeredados(true); return; }
+
+  arr[idx].historial[historialIdx].nota = nuevaNota;
+  const entryId = arr[idx].historial[historialIdx].id;
+  try{
+    await ref.update({ [seccion]: arr });
+  }catch(e){
+    console.error(e); toast('No se pudo guardar: sin conexión con Firestore. Intenta de nuevo en un momento.'); return;
+  }
+  const cacheDoc = sesionesCache.find(s => s.id === origenId);
+  if(cacheDoc) cacheDoc[seccion] = arr;
+
+  await sincronizarSeguimientosTrasEdicionHistorial(entryId, nuevaNota);
+
+  pendienteHistorialEditIdx = null;
+  toast('Actualización corregida');
+  cargarPendientesHeredados(false);
+}
+
+// Elimina una actualización puntual de la línea de tiempo (por si se ingresó por error)
+async function eliminarEntradaHistorial(origenId, seccion, itemId, historialIdx){
+  if(!confirm('¿Eliminar esta actualización de la línea de tiempo? Esta acción no se puede deshacer.')) return;
+
+  const ref = db.collection('sesiones').doc(origenId);
+  const doc = await ref.get();
+  if(!doc.exists){ toast('La sesión de origen ya no existe'); cargarPendientesHeredados(true); return; }
+  const data = doc.data();
+  const arr = data[seccion] || [];
+  const idx = arr.findIndex(i => i.id === itemId);
+  if(idx === -1 || !arr[idx].historial){ toast('La actualización ya no existe'); cargarPendientesHeredados(true); return; }
+
+  const entryId = arr[idx].historial[historialIdx].id;
+  arr[idx].historial.splice(historialIdx, 1);
+  try{
+    await ref.update({ [seccion]: arr });
+  }catch(e){
+    console.error(e); toast('No se pudo eliminar: sin conexión con Firestore. Intenta de nuevo en un momento.'); return;
+  }
+  const cacheDoc = sesionesCache.find(s => s.id === origenId);
+  if(cacheDoc) cacheDoc[seccion] = arr;
+
+  await sincronizarSeguimientosTrasEdicionHistorial(entryId, null);
+
+  toast('Actualización eliminada');
+  cargarPendientesHeredados(false);
+}
+
+// Elimina por completo el punto pendiente (el tema) de la sesión donde se originó
+async function eliminarPuntoPendienteCompleto(origenId, seccion, itemId, titulo){
+  if(!confirm(`¿Eliminar por completo el punto "${titulo}"? Se borrará también toda su línea de tiempo de seguimiento. Esta acción no se puede deshacer.`)) return;
+
+  const ref = db.collection('sesiones').doc(origenId);
+  const doc = await ref.get();
+  if(!doc.exists){ toast('La sesión de origen ya no existe'); pendienteAbierto = null; cargarPendientesHeredados(true); return; }
+  const data = doc.data();
+  const item = (data[seccion]||[]).find(i => i.id === itemId);
+  const idsHistorialAEliminar = item && item.historial ? item.historial.map(h => h.id).filter(Boolean) : [];
+  const arr = (data[seccion] || []).filter(i => i.id !== itemId);
+
+  try{
+    await ref.update({ [seccion]: arr });
+  }catch(e){
+    console.error(e); toast('No se pudo eliminar: sin conexión con Firestore. Intenta de nuevo en un momento.'); return;
+  }
+  const cacheDoc = sesionesCache.find(s => s.id === origenId);
+  if(cacheDoc) cacheDoc[seccion] = arr;
+
+  for(const entryId of idsHistorialAEliminar){
+    await sincronizarSeguimientosTrasEdicionHistorial(entryId, null);
+  }
+
+  pendienteAbierto = null;
+  pendienteModoEdicionPunto = false;
+  pendienteHistorialEditIdx = null;
+  toast('Punto pendiente eliminado');
+  cargarPendientesHeredados(false);
+}
+
+async function guardarSeguimientoPendiente(origenId, seccion, itemId){
+  const nota = rteGetValue('seg-nota');
+  const estadoSeleccionado = document.querySelector('input[name="seg-estado"]:checked').value; // 'pendiente' | 'resuelto'
+
+  if(!nota && estadoSeleccionado === 'pendiente'){
+    toast('Agrega una nota de avance, o marca el punto como resuelto.');
+    return;
+  }
+
+  const cfg = SECTIONS[seccion];
+  const ref = db.collection('sesiones').doc(origenId);
+  const doc = await ref.get();
+  if(!doc.exists){ toast('La sesión de origen ya no existe'); pendienteAbierto = null; cargarPendientesHeredados(true); return; }
+  const data = doc.data();
+  const arr = data[seccion] || [];
+  const idx = arr.findIndex(i => i.id === itemId);
+  if(idx === -1){ toast('El punto ya no existe'); pendienteAbierto = null; cargarPendientesHeredados(true); return; }
+
+  const notaFinal = nota || (estadoSeleccionado === 'resuelto' ? '(resuelto sin nota adicional)' : '(actualización sin nota)');
+  const nuevaEntradaId = uid();
+
+  arr[idx].historial = arr[idx].historial || [];
+  arr[idx].historial.push({ id: nuevaEntradaId, fecha: sesionActual.fecha, nota: notaFinal });
+
+  if(estadoSeleccionado === 'resuelto'){
+    arr[idx].resuelto = true;
+    arr[idx].seguimiento = nota;
+    arr[idx].resueltoEnSesionId = sesionActual.id;
+  }
+
+  try{
+    await ref.update({ [seccion]: arr });
+  }catch(e){
+    console.error(e); toast('No se pudo guardar: sin conexión con Firestore. Intenta de nuevo en un momento.'); return;
+  }
+
+  // reflejar localmente en la caché para que se actualice sin recargar todo
+  const cacheDoc = sesionesCache.find(s => s.id === origenId);
+  if(cacheDoc) cacheDoc[seccion] = arr;
+
+  // Registrar este seguimiento en la SESIÓN ACTUAL para que aparezca en su propia acta,
+  // aunque el punto pendiente pertenezca a una sesión anterior.
+  sesionActual.seguimientos = sesionActual.seguimientos || [];
+  sesionActual.seguimientos.push({
+    historialEntryId: nuevaEntradaId,
+    titulo: arr[idx][cfg.tituloCampo] || '(sin título)',
+    seccionLabel: cfg.label,
+    origenFecha: data.fecha || '',
+    nota: notaFinal,
+    estado: estadoSeleccionado
+  });
+  programarGuardado();
+
+  pendienteAbierto = null;
+  pendienteModoEdicionPunto = false;
+  pendienteHistorialEditIdx = null;
+  toast(estadoSeleccionado === 'resuelto' ? 'Punto dado por finalizado' : 'Actualización guardada');
+  cargarPendientesHeredados(false);
+  renderActa();
+}
+
+
+// ============================================================
+// ASISTENCIA
+// ============================================================
+function renderAsistencia(){
+  const cont = document.getElementById('lista-asistencia');
+  const asistencia = sesionActual.asistencia || [];
+  cont.innerHTML = asistencia.map((a, idx) => `
+    <label class="flex items-center gap-2 p-2 rounded-lg border text-sm" style="border-color:var(--line);">
+      <input type="checkbox" ${a.presente?'checked':''} onchange="toggleAsistencia(${idx}, this.checked)" style="width:16px;height:16px;">
+      <span>${escapeHTML(a.nombre)}</span>
+    </label>
+  `).join('') || `<p class="text-sm" style="color:var(--muted)">Aún no hay nómina configurada. Ve a Ajustes → Nómina del Consejo.</p>`;
+
+  const inv = sesionActual.invitados || [];
+  document.getElementById('lista-invitados').innerHTML = inv.map((n, idx) => `
+    <div class="flex items-center justify-between text-sm p-2 rounded-lg" style="background:var(--paper-2);">
+      <span>${escapeHTML(n)}</span>
+      <button class="btn btn-danger btn-sm" onclick="eliminarInvitado(${idx})">✕</button>
+    </div>`).join('');
+}
+function toggleAsistencia(idx, val){
+  sesionActual.asistencia[idx].presente = val;
+  actualizarContadores();
+  programarGuardado();
+}
+function agregarInvitado(){
+  const el = document.getElementById('f-invitado-nombre');
+  const nombre = el.value.trim();
+  if(!nombre) return;
+  sesionActual.invitados = sesionActual.invitados || [];
+  sesionActual.invitados.push(nombre);
+  el.value = '';
+  renderAsistencia();
+  programarGuardado();
+}
+function eliminarInvitado(idx){
+  sesionActual.invitados.splice(idx,1);
+  renderAsistencia();
+  programarGuardado();
+}
+
+// ============================================================
+// AJUSTES (nómina + conexión)
+// ============================================================
+function abrirAjustes(tab){
+  cambiarTabAjustes(tab || 'roster');
+  abrirModalEl('modal-ajustes');
+  document.getElementById('firebase-actual').textContent = firebaseConfig ? ('projectId: ' + firebaseConfig.projectId) : '—';
+}
+function cambiarTabAjustes(tab){
+  ajustesTabActual = tab;
+  document.querySelectorAll('.tab-mini').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('ajustes-roster').style.display = tab === 'roster' ? 'block' : 'none';
+  document.getElementById('ajustes-firebase').style.display = tab === 'firebase' ? 'block' : 'none';
+}
+function renderRosterAjustes(){
+  const list = getRoster();
+  document.getElementById('roster-lista').innerHTML = list.map((n, idx) => `
+    <div class="flex items-center justify-between text-sm p-2 rounded-lg" style="background:var(--paper-2);">
+      <span>${escapeHTML(n)}</span>
+      <button class="btn btn-danger btn-sm" onclick="eliminarMiembroRoster(${idx})">✕</button>
+    </div>`).join('') || `<p class="text-sm" style="color:var(--muted)">No hay miembros registrados todavía.</p>`;
+}
+function agregarMiembroRoster(){
+  const el = document.getElementById('roster-nuevo');
+  const nombre = el.value.trim();
+  if(!nombre) return;
+  const list = getRoster();
+  list.push(nombre);
+  setRoster(list);
+  el.value = '';
+  renderRosterAjustes();
+  toast('Miembro agregado a la nómina base');
+}
+function eliminarMiembroRoster(idx){
+  const list = getRoster();
+  list.splice(idx,1);
+  setRoster(list);
+  renderRosterAjustes();
+}
+
+// ============================================================
+// HISTORIAL
+// ============================================================
+
+// ============================================================
+// HISTORIAL DE PUNTOS RESUELTOS (con opción de reabrir)
+// ============================================================
+let resueltosCache = []; // [{ origenId, origenFecha, seccion, item }]
+
+async function abrirHistorialResueltos(){
+  abrirModalEl('modal-resueltos');
+  document.getElementById('resueltos-buscar').value = '';
+  document.getElementById('resueltos-lista').innerHTML = `<p class="text-sm text-center py-6" style="color:var(--muted)">Cargando…</p>`;
+
+  let snap;
+  try{
+    snap = await db.collection('sesiones').orderBy('fecha','desc').get();
+  }catch(e){
+    console.error(e);
+    document.getElementById('resueltos-lista').innerHTML = `<p class="text-sm text-center py-6" style="color:var(--rust)">No se pudo cargar: sin conexión con Firestore. Intenta de nuevo en un momento.</p>`;
+    return;
+  }
+
+  resueltosCache = [];
+  snap.docs.forEach(d => {
+    const s = { id:d.id, ...d.data() };
+    Object.keys(SECTIONS).forEach(seccion => {
+      (s[seccion]||[]).forEach(item => {
+        if(item.resuelto){
+          resueltosCache.push({ origenId:s.id, origenFecha:s.fecha, seccion, item });
+        }
+      });
+    });
+  });
+  resueltosCache.sort((a,b) => (a.origenFecha < b.origenFecha ? 1 : -1));
+  renderResueltosLista();
+}
+
+function renderResueltosLista(){
+  const q = normalizarBusqueda(document.getElementById('resueltos-buscar').value || '');
+  const cont = document.getElementById('resueltos-lista');
+
+  const filtrados = resueltosCache.filter(r => {
+    if(!q) return true;
+    const cfg = SECTIONS[r.seccion];
+    const titulo = r.item[cfg.tituloCampo] || '';
+    return normalizarBusqueda(titulo + ' ' + textoPlano(r.item.detalle) + ' ' + textoPlano(r.item.seguimiento||'')).includes(q);
+  });
+
+  if(filtrados.length === 0){
+    cont.innerHTML = `<p class="text-sm text-center py-6" style="color:var(--muted)">No hay puntos resueltos${q ? ' que coincidan con tu búsqueda' : ' todavía'}.</p>`;
+    return;
+  }
+
+  cont.innerHTML = filtrados.map(r => {
+    const cfg = SECTIONS[r.seccion];
+    const titulo = r.item[cfg.tituloCampo] || '(sin título)';
+    return `
+    <div class="item-card fade-in">
+      <div class="flex items-start gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap mb-1">
+            <span class="badge badge-resuelto">✅ Resuelto</span>
+            <span class="badge badge-informativo">${cfg.icon} ${cfg.label}</span>
+            <span class="mono text-xs" style="color:var(--muted)">Origen: ${formatearFechaLarga(r.origenFecha)}</span>
+          </div>
+          <h3 class="font-semibold text-sm" style="color:var(--ink)">${escapeHTML(titulo)}</h3>
+          ${r.item.detalle ? `<p class="text-xs mt-1 rte-content" style="color:var(--text)">${detalleComoHTML(r.item.detalle)}</p>` : ''}
+          ${r.item.seguimiento ? `<p class="text-xs mt-1 rte-content" style="color:var(--sage);"><b>Resolución:</b> ${detalleComoHTML(r.item.seguimiento)}</p>` : ''}
+        </div>
+        <button class="btn btn-primary btn-sm shrink-0" onclick="reabrirPuntoResuelto('${r.origenId}','${r.seccion}','${r.item.id}')">↺ Reabrir caso</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function reabrirPuntoResuelto(origenId, seccion, itemId){
+  const motivo = prompt('¿Qué información nueva surgió? Escribe brevemente el motivo para reabrir este caso (quedará registrado en su línea de tiempo):');
+  if(motivo === null) return;
+  if(!motivo.trim()){ toast('Escribe un motivo para reabrir el caso.'); return; }
+
+  const ref = db.collection('sesiones').doc(origenId);
+  const doc = await ref.get();
+  if(!doc.exists){ toast('La sesión de origen ya no existe'); return; }
+  const data = doc.data();
+  const arr = data[seccion] || [];
+  const idx = arr.findIndex(i => i.id === itemId);
+  if(idx === -1){ toast('El punto ya no existe'); return; }
+
+  arr[idx].resuelto = false;
+  arr[idx].pendiente = true;
+  arr[idx].historial = arr[idx].historial || [];
+  arr[idx].historial.push({
+    fecha: (sesionActual && sesionActual.fecha) || hoyISO(),
+    nota: `Caso reabierto: ${motivo.trim()}`
+  });
+
+  try{
+    await ref.update({ [seccion]: arr });
+  }catch(e){
+    console.error(e);
+    toast('No se pudo reabrir: sin conexión con Firestore. Intenta de nuevo en un momento.');
+    return;
+  }
+
+  const cacheDoc = sesionesCache.find(s => s.id === origenId);
+  if(cacheDoc) cacheDoc[seccion] = arr;
+
+  toast('Caso reabierto — vuelve a aparecer en pendientes de sesiones anteriores');
+  abrirHistorialResueltos();
+  if(sesionActual) cargarPendientesHeredados(true);
+}
+
+// ============================================================
+// BÚSQUEDA GENERAL (entre todas las sesiones registradas)
+// ============================================================
+let busquedaTodasSesiones = [];
+let busquedaDebounceTimeout = null;
+
+function normalizarBusqueda(s){
+  return (s||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+
+async function abrirBusquedaGlobal(){
+  abrirModalEl('modal-busqueda');
+  document.getElementById('busqueda-input').value = '';
+  document.getElementById('busqueda-resultados').innerHTML = `<p class="text-sm text-center py-6" style="color:var(--muted)">Cargando historial completo…</p>`;
+  document.getElementById('busqueda-input').focus();
+
+  try{
+    const snap = await db.collection('sesiones').orderBy('fecha','desc').get();
+    busquedaTodasSesiones = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    document.getElementById('busqueda-resultados').innerHTML = `<p class="text-sm text-center py-6" style="color:var(--muted)">${busquedaTodasSesiones.length} sesiones cargadas. Escribe para buscar…</p>`;
+  }catch(e){
+    console.error(e);
+    document.getElementById('busqueda-resultados').innerHTML = `<p class="text-sm text-center py-6" style="color:var(--rust)">No se pudo cargar el historial: sin conexión con Firestore. Intenta de nuevo en un momento.</p>`;
+  }
+}
+
+function ejecutarBusquedaGlobalDebounced(){
+  clearTimeout(busquedaDebounceTimeout);
+  busquedaDebounceTimeout = setTimeout(ejecutarBusquedaGlobal, 250);
+}
+
+function ejecutarBusquedaGlobal(){
+  const qRaw = document.getElementById('busqueda-input').value.trim();
+  const cont = document.getElementById('busqueda-resultados');
+  if(qRaw.length < 2){
+    cont.innerHTML = `<p class="text-sm text-center py-6" style="color:var(--muted)">Escribe al menos 2 caracteres para buscar…</p>`;
+    return;
+  }
+  const q = normalizarBusqueda(qRaw);
+  const resultados = [];
+
+  busquedaTodasSesiones.forEach(s => {
+    // Campos generales de la sesión (lugar, moderador, secretario)
+    const generales = [s.lugar, s.moderador, s.secretario].filter(Boolean).join(' — ');
+    if(generales && normalizarBusqueda(generales).includes(q)){
+      resultados.push({ sesionId:s.id, fecha:s.fecha, seccion:'', seccionLabel:'Datos de sesión', seccionIcon:'🗓️', titulo:'', snippet:generales });
+    }
+
+    // Cada sección de ítems (correspondencias, audiencias, citados, informes, temas, acuerdos)
+    Object.keys(SECTIONS).forEach(seccion => {
+      const cfg = SECTIONS[seccion];
+      (s[seccion]||[]).forEach(item => {
+        const camposTexto = cfg.fields.map(f => item[f.key]||'').filter(Boolean).join(' — ');
+        const detallePlano = textoPlano(item.detalle);
+        const votacionTexto = item.votacion ? item.votacion.propuestas.map(p=>p.texto).join(' ') : '';
+        const historialTexto = (item.historial||[]).map(h => textoPlano(h.nota)).join(' ');
+        const textoCompleto = [camposTexto, detallePlano, votacionTexto, historialTexto].join(' ');
+
+        if(normalizarBusqueda(textoCompleto).includes(q)){
+          const titulo = item[cfg.tituloCampo] || '(sin título)';
+          const snippet = detallePlano || camposTexto || historialTexto;
+          resultados.push({ sesionId:s.id, fecha:s.fecha, seccion, seccionLabel:cfg.label, seccionIcon:cfg.icon, titulo, snippet: snippet.slice(0,220) });
+        }
+      });
+    });
+
+    // Seguimientos a pendientes registrados en esta sesión
+    (s.seguimientos||[]).forEach(sg => {
+      const texto = [sg.titulo, textoPlano(sg.nota)].join(' ');
+      if(normalizarBusqueda(texto).includes(q)){
+        resultados.push({ sesionId:s.id, fecha:s.fecha, seccion:'acta', seccionLabel:'Seguimiento a pendiente', seccionIcon:'📌', titulo:sg.titulo, snippet: textoPlano(sg.nota).slice(0,220) });
+      }
+    });
+  });
+
+  if(resultados.length === 0){
+    cont.innerHTML = `<p class="text-sm text-center py-6" style="color:var(--muted)">Sin resultados para "${escapeHTML(qRaw)}".</p>`;
+    return;
+  }
+
+  resultados.sort((a,b) => (a.fecha < b.fecha ? 1 : -1));
+
+  cont.innerHTML = `<p class="text-xs mb-1" style="color:var(--muted)">${resultados.length} resultado(s):</p>` + resultados.map(r => `
+    <div class="item-card fade-in" style="cursor:pointer;" onclick="irAResultadoBusqueda('${r.sesionId}','${r.seccion}')">
+      <div class="flex items-center gap-2 flex-wrap mb-1">
+        <span class="mono text-xs" style="color:var(--muted)">${formatearFechaLarga(r.fecha) || 'Sin fecha'}</span>
+        <span class="badge badge-informativo">${r.seccionIcon} ${r.seccionLabel}</span>
+      </div>
+      ${r.titulo ? `<h3 class="font-semibold text-sm" style="color:var(--ink)">${escapeHTML(r.titulo)}</h3>` : ''}
+      ${r.snippet ? `<p class="text-xs mt-1" style="color:var(--text)">${escapeHTML(r.snippet)}</p>` : ''}
+    </div>
+  `).join('');
+}
+
+function irAResultadoBusqueda(sesionId, seccion){
+  cerrarModal('modal-busqueda');
+  abrirSesion(sesionId).then(() => {
+    if(seccion) cambiarPanel(seccion);
+  });
+}
+
+async function abrirHistorial(){
+  await cargarUltimasSesiones();
+  renderHistorial();
+  abrirModalEl('modal-historial');
+}
+function renderHistorial(){
+  const q = (document.getElementById('hist-buscar').value || '').toLowerCase();
+  const cont = document.getElementById('hist-lista');
+  const filtradas = sesionesCache.filter(s =>
+    !q || (s.fecha||'').includes(q) || (s.lugar||'').toLowerCase().includes(q)
+  );
+  if(filtradas.length === 0){
+    cont.innerHTML = `<p class="text-sm text-center py-6" style="color:var(--muted)">Sin resultados.</p>`;
+    return;
+  }
+  cont.innerHTML = filtradas.map(s => `
+    <div class="item-card flex items-center gap-3">
+      <div class="date-tile" style="width:48px;height:48px;">${dateTileHTML(s.fecha)}</div>
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold text-sm" style="color:var(--ink)">${s.fecha ? formatearFechaLarga(s.fecha) : 'Sin fecha'}</p>
+        <p class="text-xs" style="color:var(--muted)">${s.tipo === 'extraordinaria' ? 'Extraordinaria' : 'Ordinaria'} · ${escapeHTML(s.lugar||'')} · ${s.estado === 'finalizada' ? 'Finalizada' : 'Borrador'}</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="abrirSesion('${s.id}'); cerrarModal('modal-historial');">Abrir</button>
+      <button class="btn btn-danger btn-sm" onclick='eliminarSesion(${jsAttr(s.id)}, ${jsAttr(s.fecha||"")})'>🗑 Eliminar</button>
+    </div>
+  `).join('');
+}
+
+async function eliminarSesion(id, fecha){
+  const etiqueta = fecha ? formatearFechaLarga(fecha) : '(sin fecha)';
+  const escritoPorUsuario = prompt(
+    `Esto eliminará PERMANENTEMENTE la sesión del ${etiqueta} y todo su contenido — correspondencias, citados, informes, acuerdos, etc. Esta acción no se puede deshacer.\n\nPara confirmar, escribe la fecha exactamente así: ${fecha}`
+  );
+  if(escritoPorUsuario === null) return;
+  if(escritoPorUsuario.trim() !== fecha){
+    toast('Texto de confirmación incorrecto — no se eliminó nada.');
+    return;
+  }
+
+  try{
+    await db.collection('sesiones').doc(id).delete();
+  }catch(e){
+    console.error(e);
+    toast('No se pudo eliminar: sin conexión con Firestore. Intenta de nuevo en un momento.');
+    return;
+  }
+  sesionesCache = sesionesCache.filter(s => s.id !== id);
+
+  // Si la sesión eliminada era la que estaba abierta, regresar a la pantalla "sin sesión activa"
+  if(sesionActual && sesionActual.id === id){
+    sesionActual = null;
+    document.getElementById('session-panels').style.display = 'none';
+    document.getElementById('no-session-msg').style.display = 'block';
+    document.getElementById('sidebar-fecha').textContent = 'Sin sesión activa';
+    document.getElementById('topbar-date').innerHTML = '<span class="day">—</span><span class="mon">· · ·</span>';
+  }
+
+  renderHistorial();
+  toast('Sesión eliminada');
+}
+
+// ============================================================
+// VISTA DE ACTA (impresión / copia de texto)
+// ============================================================
+function renderActa(){
+  if(!sesionActual) return;
+  const s = sesionActual;
+  const cont = document.getElementById('acta-contenido');
+
+  const bloque = (key) => {
+    const cfg = SECTIONS[key];
+    const items = s[key] || [];
+    const encabezado = `<h3 style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink);margin:18px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px;">${cfg.label}</h3>`;
+    if(items.length === 0){
+      return `${encabezado}<p style="font-size:12.5px;color:var(--muted);font-style:italic;margin:0 0 8px;">Sin registros en esta sesión.</p>`;
+    }
+    const filas = items.map((item, idx) => {
+      const titulo = item[cfg.tituloCampo] || '';
+      const decisionKey = cfg.fields.find(f => ['decision','resultado','estado'].includes(f.key));
+      const decisionVal = decisionKey ? item[decisionKey.key] : '';
+      const otrosCampos = cfg.fields
+        .filter(f => f.key !== cfg.tituloCampo && f.key !== (decisionKey ? decisionKey.key : ''))
+        .map(f => item[f.key] ? `${f.label}: ${escapeHTML(item[f.key])}` : '')
+        .filter(Boolean)
+        .join(' · ');
+      const nota = cfg.numerado ? `Nota N.º ${idx+1} — ` : '';
+      let votoTxt = '';
+      if(item.votacion){
+        votoTxt = ' Votación: ' + item.votacion.propuestas.map(p => `${p.texto} (${p.votos} votos)`).join(' vs. ') + '.';
+      }
+      let adjuntosTxt = '';
+      if(cfg.adjuntos && item.archivos && item.archivos.length){
+        adjuntosTxt = ' <i>Adjuntos: ' + item.archivos.map(a => escapeHTML(a.nombre)).join(', ') + '.</i>';
+      }
+      const pendienteTxt = (item.pendiente && !item.resuelto) ? ' <i style="color:var(--gold);">(Queda pendiente para seguimiento.)</i>' : '';
+      const otrosCamposHTML = otrosCampos ? `<br><span style="color:var(--muted);font-size:12px;">${otrosCampos}</span>` : '';
+      return `<p style="margin:0 0 10px;font-size:13.5px;line-height:1.55;" class="rte-content"><b>${nota}${escapeHTML(titulo)}</b>${decisionVal ? ' — ' + decisionVal + '.' : '.'}${otrosCamposHTML} ${detalleComoHTML(item.detalle||'')}${votoTxt}${adjuntosTxt}${pendienteTxt}</p>`;
+    }).join('');
+    return `${encabezado}${filas}`;
+  };
+
+  const seguimientos = s.seguimientos || [];
+
+  const asistentesPresentes = (s.asistencia||[]).filter(a=>a.presente).map(a=>a.nombre);
+  const asistentesAusentes = (s.asistencia||[]).filter(a=>!a.presente).map(a=>a.nombre);
+
+  cont.innerHTML = `
+    <div style="text-align:center;margin-bottom:18px;">
+      <p style="font-family:'Playfair Display',serif;font-weight:700;font-size:16px;margin:0;color:var(--ink);">IGLESIA EVANGÉLICA CENTROAMERICANA "SALEM"</p>
+      <p style="font-size:12px;color:var(--muted);margin:2px 0;">Patzún, Chimaltenango — Consejo Local</p>
+      <p style="font-family:'IBM Plex Mono',monospace;font-size:11px;margin-top:6px;color:var(--gold);text-transform:uppercase;letter-spacing:.08em;">${s.tipo === 'extraordinaria' ? 'Sesión Extraordinaria' : 'Sesión Ordinaria'} · ${s.fecha ? formatearFechaLarga(s.fecha) : '—'}</p>
+    </div>
+    <p style="font-size:13.5px;line-height:1.6;">
+      Sesión <b>${s.tipo === 'extraordinaria' ? 'extraordinaria' : 'ordinaria'}</b> del Consejo Local, celebrada el
+      <b>${s.fecha ? formatearFechaLarga(s.fecha) : '_______'}</b>${s.lugar ? ', en ' + escapeHTML(s.lugar) : ''}${s.horaInicio ? ', dando inicio a las ' + s.horaInicio + ' horas' : ''}${s.horaFin ? ' y finalizando a las ' + s.horaFin + ' horas' : ''}.
+      ${s.moderador ? 'Modera: ' + escapeHTML(s.moderador) + '.' : ''} ${s.secretario ? 'Secretario(a): ' + escapeHTML(s.secretario) + '.' : ''}
+    </p>
+    <p style="font-size:12.5px;margin-top:10px;color:var(--muted);">
+      <b>Presentes (${asistentesPresentes.length}):</b> ${asistentesPresentes.map(escapeHTML).join(', ') || '—'}<br>
+      ${asistentesAusentes.length ? `<b>Ausentes:</b> ${asistentesAusentes.map(escapeHTML).join(', ')}` : ''}
+      ${(s.invitados||[]).length ? `<br><b>Invitados:</b> ${s.invitados.map(escapeHTML).join(', ')}` : ''}
+    </p>
+
+    <h3 style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink);margin:18px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px;">Apertura: Reflexión bíblica</h3>
+    ${(s.reflexion && (s.reflexion.contenido || s.reflexion.referencia || s.reflexion.encargado))
+      ? `<p style="font-size:13.5px;line-height:1.55;" class="rte-content">
+          ${s.reflexion.encargado ? `A cargo de: <b>${escapeHTML(s.reflexion.encargado)}</b>. ` : ''}${s.reflexion.referencia ? `Referencia: <b>${escapeHTML(s.reflexion.referencia)}</b>. ` : ''}${detalleComoHTML(s.reflexion.contenido||'')}
+        </p>`
+      : `<p style="font-size:12.5px;color:var(--muted);font-style:italic;margin:0 0 8px;">Sin reflexión registrada en esta sesión.</p>`}
+
+    <h3 style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink);margin:18px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px;">Agenda del día</h3>
+    ${s.agenda
+      ? `<div style="font-size:13.5px;line-height:1.55;" class="rte-content">${detalleComoHTML(s.agenda)}</div>`
+      : `<p style="font-size:12.5px;color:var(--muted);font-style:italic;margin:0 0 8px;">Sin agenda registrada en esta sesión.</p>`}
+
+    ${bloque('correspondencias')}
+    ${bloque('audiencias')}
+    ${bloque('citados')}
+    ${bloque('informes')}
+    ${bloque('temas')}
+    ${bloque('acuerdos')}
+
+    <h3 style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink);margin:18px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px;">Seguimiento a pendientes de sesiones anteriores</h3>
+    ${seguimientos.length
+      ? seguimientos.map(sg => `<p style="font-size:13.5px;line-height:1.55;" class="rte-content">— <b>${escapeHTML(sg.titulo)}</b> (${escapeHTML(sg.seccionLabel)}, originado el ${sg.origenFecha ? formatearFechaLarga(sg.origenFecha) : '—'}): ${detalleComoHTML(sg.nota)} <i>${sg.estado === 'resuelto' ? '— Dado por finalizado.' : '— Sigue pendiente.'}</i></p>`).join('')
+      : `<p style="font-size:12.5px;color:var(--muted);font-style:italic;margin:0 0 8px;">Sin seguimientos a pendientes en esta sesión.</p>`}
+
+    <p style="font-size:13px;margin-top:24px;color:var(--muted);">
+      Sin más asuntos que tratar, se da por finalizada la sesión${s.horaFin ? ' a las ' + s.horaFin + ' horas' : ''}.
+    </p>
+
+    <div style="display:flex;justify-content:space-between;margin-top:50px;">
+      <div style="text-align:center;width:45%;border-top:1px solid var(--text);padding-top:6px;font-size:12px;">Moderador</div>
+      <div style="text-align:center;width:45%;border-top:1px solid var(--text);padding-top:6px;font-size:12px;">Secretario(a)</div>
+    </div>
+  `;
+}
+
+function textoActaPlano(){
+  const s = sesionActual;
+  const cont = document.getElementById('acta-contenido');
+  let txt = cont.innerText;
+  return txt;
+}
+function copiarActaTexto(){
+  renderActa();
+  const txt = textoActaPlano();
+  navigator.clipboard.writeText(txt).then(()=> toast('Texto del acta copiado al portapapeles'))
+    .catch(()=> toast('No se pudo copiar automáticamente; selecciona el texto manualmente.'));
+}
+
+// ---------- Inicio de sesión (Firebase Authentication) ----------
+function msgAuth(e){
+  const m = { 'auth/invalid-credential':'Correo o contraseña incorrectos.', 'auth/wrong-password':'Correo o contraseña incorrectos.', 'auth/user-not-found':'Correo o contraseña incorrectos.',
+    'auth/invalid-email':'El correo no tiene un formato válido.', 'auth/too-many-requests':'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
+    'auth/network-request-failed':'Sin conexión con Firebase. Revisa tu internet.', 'auth/operation-not-allowed':'El inicio de sesión con correo no está habilitado en Firebase (Authentication → Sign-in method).',
+    'auth/user-disabled':'Esta cuenta está deshabilitada.' };
+  return m[e.code] || ('No se pudo iniciar sesión: ' + (e.message || e));
+}
+async function iniciarSesion(){
+  const correo = document.getElementById('lg-correo').value.trim(), clave = document.getElementById('lg-clave').value, err = document.getElementById('lg-error');
+  err.style.display = 'none'; document.getElementById('login-aviso').textContent = '';
+  if(!correo || !clave){ err.textContent = 'Escribe tu correo y contraseña.'; err.style.display = 'block'; return; }
+  document.getElementById('lg-btn').disabled = true;
+  try{ await auth.signInWithEmailAndPassword(correo, clave); document.getElementById('lg-clave').value = ''; }
+  catch(e){ err.textContent = msgAuth(e); err.style.display = 'block'; }
+  document.getElementById('lg-btn').disabled = false;
+}
+async function recuperarClave(){
+  const correo = document.getElementById('lg-correo').value.trim(), err = document.getElementById('lg-error');
+  err.style.display = 'none';
+  if(!correo){ err.textContent = 'Escribe tu correo arriba y vuelve a presionar “Olvidé mi contraseña”.'; err.style.display = 'block'; return; }
+  try{ await auth.sendPasswordResetEmail(correo); document.getElementById('login-aviso').textContent = 'Si el correo está registrado, te enviamos un enlace para crear una nueva contraseña.'; }
+  catch(e){ err.textContent = msgAuth(e); err.style.display = 'block'; }
+}
+async function cerrarSesion(motivo){
+  // Guarda lo pendiente de la sesión abierta antes de salir
+  try{ if(typeof sesionActual !== 'undefined' && sesionActual){ clearTimeout(guardarTimeout); await guardarSesionActual(); } }catch(e){}
+  if(typeof motivo === 'string') try{ sessionStorage.setItem('minutas_aviso_login', motivo); }catch(e){}
+  try{ await auth.signOut(); }catch(e){}
+}
+function reiniciarInactividad(){
+  clearTimeout(inactTimer);
+  if(!usuarioActual) return;
+  inactTimer = setTimeout(() => cerrarSesion('La sesión se cerró por inactividad (60 minutos). Tu trabajo quedó guardado.'), LIMITE_INACTIVIDAD);
+}
+['click','keydown','touchstart','scroll'].forEach(ev => document.addEventListener(ev, reiniciarInactividad, { passive:true }));
+
+// ---------- Arranque ----------
+(async function start(){
+  // El inicio de sesión de Firebase solo funciona en páginas http(s), no en archivos descargados (file:// o content://).
+  if(location.protocol !== 'http:' && location.protocol !== 'https:'){
+    document.getElementById('setup-screen').style.display = 'flex';
+    document.getElementById('setup-config-input').style.display = 'none';
+    const e0 = document.getElementById('setup-error');
+    e0.innerHTML = '<b>Este sistema no puede abrirse como archivo descargado.</b> El inicio de sesión necesita una dirección <b>https://</b>. Ábrelo desde GitHub Pages.';
+    e0.style.display = 'block';
+    return;
+  }
+  const listo = await asegurarFirebaseCargado();
+  if(!listo){
+    document.getElementById('setup-screen').style.display = 'flex';
+    document.getElementById('setup-config-input').style.display = 'none';
+    const err = document.getElementById('setup-error');
+    err.innerHTML = 'No se pudo cargar Firebase desde internet. Esto casi siempre es por un <b>bloqueador de anuncios/extensión</b> (uBlock, AdBlock, Brave Shields) o una <b>red que bloquea gstatic.com y jsdelivr.net</b>. Desactiva el bloqueador para esta página, revisa tu conexión, y recarga.';
+    err.style.display = 'block';
+    return;
+  }
+
+  // Prioridad: configuración guardada manualmente en este navegador (Ajustes → Conexión) > configuración incrustada en el archivo.
+  const cfg = cargarConfigGuardada() || EMBEDDED_FIREBASE_CONFIG;
+  try{
+    inicializarFirebase(cfg);
+    try{ await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); }catch(e){} // la sesión termina al cerrar la pestaña
+    let authListo = false;
+    const guardia = setTimeout(() => {
+      if(authListo) return;
+      document.getElementById('setup-screen').style.display = 'flex';
+      document.getElementById('setup-config-input').style.display = 'none';
+      const e1 = document.getElementById('setup-error');
+      e1.innerHTML = '<b>No se pudo verificar la sesión.</b> Abre el sistema desde su dirección https y confirma que el navegador permita almacenamiento y cookies para el sitio.';
+      e1.style.display = 'block';
+    }, 10000);
+    auth.onAuthStateChanged(user => {
+      authListo = true; clearTimeout(guardia);
+      document.getElementById('setup-screen').style.display = 'none';
+      if(user){
+        usuarioActual = user;
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        document.getElementById('btn-salir').title = 'Sesión: ' + (user.email || '');
+        if(!appIniciada){ appIniciada = true; iniciarApp(); }
+        reiniciarInactividad();
+      }else{
+        if(appIniciada){ location.reload(); return; } // la sesión terminó: se limpia todo el estado en pantalla
+        usuarioActual = null;
+        document.getElementById('app').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
+        try{ const av = sessionStorage.getItem('minutas_aviso_login'); if(av){ document.getElementById('login-aviso').textContent = av; sessionStorage.removeItem('minutas_aviso_login'); } }catch(e){}
+      }
+    });
+  }catch(e){
+    console.error(e);
+    document.getElementById('setup-screen').style.display = 'flex';
+    document.getElementById('setup-error').textContent = 'No se pudo conectar automáticamente: ' + e.message;
+    document.getElementById('setup-error').style.display = 'block';
+  }
+})();
+</script>
+</body>
+</html>
