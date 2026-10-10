@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consejo Local, panel principal</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+  // Respaldo: si gstatic.com está bloqueado (extensión, antivirus, red), se reintenta con jsDelivr.
+  function cargarScript(src){
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src; s.onload = resolve;
+      s.onerror = () => reject(new Error('No se pudo cargar: ' + src));
+      document.head.appendChild(s);
+    });
+  }
+  async function asegurarFirebaseCargado(){
+    if(typeof firebase !== 'undefined' && firebase.firestore && firebase.auth) return true;
+    try{
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js');
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.js');
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.js');
+      return typeof firebase !== 'undefined' && !!firebase.firestore && !!firebase.auth;
+    }catch(e){ return false; }
+  }
+</script>
+
+<meta name="theme-color" content="#0f1830">
+<link rel="icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="salem.css">
+<script src="salem-ui.js"></script>
+</head>
+<body>
+
+<!-- Pantalla de error de carga -->
+<div id="setup-screen" class="acceso" style="display:none;">
+  <div class="acceso-card">
+    <span class="medallon"><img src="logo.png" alt="" onerror="SalemUI.logoFallback(this)"></span>
+    <p class="marca-sup2">Iglesia Evangélica Centroamericana</p>
+    <h1 class="serif">Salem</h1>
+    <p class="acceso-sub">No se pudo conectar</p>
+    <p id="setup-error" style="font-size:.9rem;line-height:1.6;color:var(--susp);margin:0;"></p>
+  </div>
+</div>
+
+<!-- Inicio de sesión -->
+<div id="login-screen" class="acceso" style="display:none;">
+  <div class="acceso-card">
+    <span class="medallon"><img src="logo.png" alt="" onerror="SalemUI.logoFallback(this)"></span>
+    <p class="marca-sup2">Iglesia Evangélica Centroamericana</p>
+    <h1 class="serif">Salem</h1>
+    <p class="acceso-sub">Panel principal, acceso reservado al Consejo Local</p>
+    <p id="login-aviso" class="acceso-aviso"></p>
+    <div class="campo"><label class="f-label" for="lg-correo">Correo</label><input type="email" class="input" id="lg-correo" autocomplete="username" onkeydown="if(event.key==='Enter')iniciarSesion()"></div>
+    <div class="campo"><label class="f-label" for="lg-clave">Contraseña</label><input type="password" class="input" id="lg-clave" autocomplete="current-password" onkeydown="if(event.key==='Enter')iniciarSesion()"></div>
+    <p class="error-form" id="lg-error"></p>
+    <button class="btn btn-primary btn-lg" id="lg-btn" onclick="iniciarSesion()">Entrar</button>
+    <button class="link" onclick="recuperarClave()">Olvidé mi contraseña</button>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <header class="app-header no-print">
+    <div class="hdr">
+      <a class="marca" href="index.html" aria-label="Ir al inicio">
+        <span class="medallon"><img src="logo.png" alt="" onerror="SalemUI.logoFallback(this)"></span>
+        <span class="marca-txt"><span class="marca-sup">Iglesia Evangélica Centroamericana</span><span class="marca-nom">Salem</span></span>
+      </a>
+      <nav class="modnav" aria-label="Módulos"><a href="index.html" class="actual" aria-current="page">Inicio</a><a href="MinutasConsejoLocal.html">Minutas</a><a href="DisciplinaConsejoLocal.html">Disciplina</a><a href="MinisteriosConsejoLocal.html">Ministerios</a></nav>
+      <div class="acciones">
+        <div class="usuario">
+          <button class="avatar" id="btn-usuario" aria-haspopup="true" aria-expanded="false" aria-label="Menú de usuario" onclick="SalemUI.menu(event)"><span id="usuario-inicial">?</span></button>
+          <div class="menu-usuario" id="menu-usuario" role="menu">
+            <div class="mu-email" id="usuario-email"></div>
+            <button role="menuitem" onclick="cerrarSesion()" data-i="salir">Cerrar sesión</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <div id="banner-error" role="alert"></div>
+    <section class="portada">
+      <div class="marco"></div>
+      <img class="portada-marca" src="logo.png" alt="" onerror="this.remove()">
+      <span class="medallon"><img src="logo.png" alt="" onerror="SalemUI.logoFallback(this)"></span>
+      <div><h2 class="serif" id="saludo"></h2><p id="fecha-larga"></p></div>
+    </section>
+    <div class="mod-grid" id="modulos"></div>
+    <div class="panel-t"><h2 class="serif">Requieren atención</h2><span class="conteo" id="conteo-aten" style="display:none;"></span></div>
+    <div id="atencion"></div>
+    <div id="cruces"></div>
+    <div class="panel-t"><h2 class="serif">Buscar una persona</h2></div>
+    <div class="buscador"><span data-i="buscar"></span><input type="text" id="busq-persona" class="input" autocomplete="off" spellcheck="false" placeholder="Escribe un nombre para ver sus cargos y su situación en todos los módulos" oninput="renderBusqueda()"></div>
+    <div id="res-busqueda" style="margin-top:12px;"></div>
+  </main>
+</div>
+<div id="toast-root"></div>
+
+<script>
+// ---------- Conexión (mismo proyecto y misma llave de configuración que Minutas) ----------
+const EMBEDDED_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAPeBr8Rw8Hw5OS0QFIBLdpgFeqaUuzzqs",
+  authDomain: "salem-minutas.firebaseapp.com",
+  projectId: "salem-minutas",
+  storageBucket: "salem-minutas.firebasestorage.app",
+  messagingSenderId: "509496830084",
+  appId: "1:509496830084:web:8865b4265d0065a3333ad1"
+};
+let db = null, auth = null, firebaseConfig = null, usuario = null;
+let unsubs = [], timerConexion = null, inactTimer = null;
+const LIMITE_INACTIVIDAD = 30*60*1000; // 30 minutos
+
+function cargarConfigGuardada(){
+  const raw = localStorage.getItem('minutas_firebase_config');
+  if(!raw) return null;
+  try{ return JSON.parse(raw); }catch(e){ return null; }
+}
+function inicializarFirebase(config){
+  firebase.initializeApp(config);
+  db = firebase.firestore();
+  auth = firebase.auth();
+  // Algunas redes, antivirus o bloqueadores cortan el streaming (WebChannel) de Firestore.
+  // Se fuerza long-polling, que es más lento pero compatible en esos casos.
+  try{ db.settings({ experimentalForceLongPolling:true, useFetchStreams:false, merge:true }); }catch(e){}
+  firebaseConfig = config;
+}
+function olvidarConfiguracion(){
+  if(!confirm('Esto borrará la configuración guardada en este navegador. ¿Continuar?')) return;
+  localStorage.removeItem('minutas_firebase_config');
+  location.reload();
+}
+
+// ---------- Utilidades de texto y fechas ----------
+const q = id => document.getElementById(id);
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function br(s){ return esc(s).replace(/\n/g,'<br>'); }
+function norm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim(); }
+function uid(){ return 'h' + Math.random().toString(36).slice(2,9) + Date.now().toString(36); }
+function pl(n, uno, otros){ return n + ' ' + (n===1 ? uno : otros); }
+
+// Fechas siempre en hora local (evita el desfase de UTC en las tardes de Guatemala)
+function fISO(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function hoyISO(){ return fISO(new Date()); }
+function parseISO(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+function sumarDias(iso, n){ const d = parseISO(iso); d.setDate(d.getDate()+n); return fISO(d); }
+function sumarMeses(iso, n){
+  const d = parseISO(iso), dia = d.getDate();
+  d.setDate(1); d.setMonth(d.getMonth()+n);
+  const ult = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  d.setDate(Math.min(dia, ult));
+  return fISO(d);
+}
+function diffDias(a, b){ return Math.round((parseISO(b) - parseISO(a)) / 86400000); } // b - a
+function mesesTranscurridos(desde, hasta){
+  const a = parseISO(desde), b = parseISO(hasta);
+  let m = (b.getFullYear()-a.getFullYear())*12 + (b.getMonth()-a.getMonth());
+  if(b.getDate() < a.getDate()) m--;
+  return Math.max(0, m);
+}
+function fmtFecha(iso){ if(!iso) return '—'; const d = parseISO(iso); return d.getDate() + ' ' + MESES[d.getMonth()] + ' ' + d.getFullYear(); }
+function calcFin(inicio, n, unidad){
+  if(unidad==='dias') return sumarDias(inicio, n);
+  if(unidad==='semanas') return sumarDias(inicio, n*7);
+  if(unidad==='anios') return sumarMeses(inicio, n*12);
+  return sumarMeses(inicio, n);
+}
+const UNIDADES = { dias:['día','días'], semanas:['semana','semanas'], meses:['mes','meses'], anios:['año','años'] };
+
+function toast(msg, error){
+  const t = document.createElement('div');
+  t.className = 'toast' + (error ? ' err' : ''); t.textContent = msg;
+  q('toast-root').appendChild(t); setTimeout(() => t.remove(), 2600);
+}
+function abrirModal(id){ q(id).style.display = 'flex'; }
+function cerrarModal(id){ q(id).style.display = 'none'; }
+
+
+// ---------- Módulos (para agregar otro sistema, basta con añadir un objeto aquí) ----------
+const MODULOS = [
+  { id:'minutas',    ico:'minutas', titulo:'Minutas',    desc:'Sesiones, acuerdos y seguimiento del Consejo.', href:'MinutasConsejoLocal.html',     nums:() => numsMinutas() },
+  { id:'disciplina', ico:'disciplina', titulo:'Disciplina', desc:'Casos de suspensión y habilitación de privilegios.', href:'DisciplinaConsejoLocal.html',  nums:() => numsDisciplina() },
+  { id:'ministerios',ico:'ministerios', titulo:'Ministerios y grupos', desc:'Directivas, integrantes e historial de cada grupo.', href:'MinisteriosConsejoLocal.html', nums:() => numsMinisterios() },
+  { id:'calendario', ico:'calendario', titulo:'Calendario de actividades', desc:'Sistema independiente; se conectará en una próxima etapa.', href:'https://joseap35.github.io/calendario-salem/', futuro:true, nums:() => [] }
+];
+const DIAS_AVISO = 30;
+let disc = [], mins = [], ses = [], personas = [], cargado = {}, contado = false;
+function icoAlerta(n){ return ic(n==='vencida' ? 'alerta' : n==='proxima' ? 'reloj' : 'reloj-arena'); }
+
+function autorActual(){ return usuario && usuario.email ? usuario.email : ''; }
+function detenerApp(){
+  unsubs.forEach(u => { try{ u(); }catch(e){} }); unsubs = []; clearTimeout(timerConexion);
+  disc = []; mins = []; ses = []; personas = []; cargado = {};
+}
+function iniciarApp(){
+  detenerApp();
+  const h = new Date();
+  const hr = h.getHours();
+  q('saludo').textContent = hr<12 ? 'Buenos días' : hr<19 ? 'Buenas tardes' : 'Buenas noches';
+  { const f = h.toLocaleDateString('es-GT', { weekday:'long', day:'numeric', month:'long', year:'numeric' }); q('fecha-larga').textContent = f.charAt(0).toUpperCase() + f.slice(1); }
+  const sub = (nombre, destino) => unsubs.push(db.collection(nombre).onSnapshot(snap => {
+    destino(snap.docs.map(d => ({ id:d.id, ...d.data() }))); cargado[nombre] = true; q('banner-error').style.display = 'none'; render();
+  }, errorFirestore));
+  sub('disciplina', r => { disc = r; });
+  sub('ministerios', r => { mins = r; });
+  sub('personas', r => { personas = r; });
+  unsubs.push(db.collection('sesiones').orderBy('fecha','desc').limit(80).onSnapshot(snap => {
+    ses = snap.docs.map(d => ({ id:d.id, ...d.data() })); cargado.sesiones = true; render();
+  }, e => { console.warn('Sesiones no disponible:', e); cargado.sesiones = 'error'; render(); }));
+  timerConexion = setTimeout(() => {
+    if(cargado.disciplina || cargado.ministerios) return;
+    const b = q('banner-error');
+    b.innerHTML = '<b>No se logra conectar con Firestore.</b> Revisa tu conexión, que ningún bloqueador bloquee <b>firestore.googleapis.com</b> y que las reglas incluyan las colecciones <b>disciplina</b>, <b>ministerios</b> y <b>personas</b>.';
+    b.style.display = 'block';
+  }, 10000);
+}
+
+// ---------- Lógica de alertas (misma que en Disciplina y Ministerios) ----------
+function ultimaRevision(c){
+  const hoy = hoyISO();
+  const fechas = (c.historial||[]).filter(h => h.tipo==='revision' && h.fecha && h.fecha <= hoy).map(h => h.fecha).sort();
+  return fechas.length ? fechas[fechas.length-1] : null;
+}
+function alertaCaso(c){
+  if(c.estado !== 'suspendido') return null;
+  const hoy = hoyISO();
+  if(c.fechaFin){
+    const d = diffDias(hoy, c.fechaFin);
+    if(d < 0) return { nivel:'vencida', orden:0, dias:d, chip:'Plazo vencido', texto:'La fecha final venció hace ' + pl(-d,'día','días') + ' y el caso sigue sin resolución.' };
+    if(d <= 15) return { nivel:'proxima', orden:1, dias:d, chip:d===0?'Termina hoy':'Faltan ' + pl(d,'día','días'),
+      texto: d===0 ? 'La suspensión termina hoy.' : 'La suspensión termina en ' + pl(d,'día','días') + ' (' + fmtFecha(c.fechaFin) + ').' };
+    return null;
+  }
+  const rev = ultimaRevision(c);
+  const base = rev || c.fechaInicio;
+  if(!base || hoy < sumarMeses(base, 3)) return null;
+  const m = mesesTranscurridos(c.fechaInicio, hoy);
+  return { nivel:'indef', orden:2, dias:-diffDias(c.fechaInicio, hoy), chip:'Sin resolución, ' + pl(m,'mes','meses'),
+    texto:'Suspensión indefinida con ' + pl(m,'mes','meses') + ' sin resolución' + (rev ? ' (última revisión: ' + fmtFecha(rev) + ').' : '.') };
+}
+function duracionTexto(c){
+  if(!c.fechaFin) return 'Indefinido';
+  if(c.cantidad && c.unidad){ const u = UNIDADES[c.unidad] || UNIDADES.meses; return c.cantidad + ' ' + (c.cantidad===1 ? u[0] : u[1]); }
+  return pl(diffDias(c.fechaInicio, c.fechaFin), 'día', 'días');
+}
+function lineaTiempo(c){
+  if(c.estado === 'habilitado'){
+    const dias = c.fechaHabilitacion ? diffDias(c.fechaInicio, c.fechaHabilitacion) : null;
+    return 'Habilitado el ' + fmtFecha(c.fechaHabilitacion) + (dias!=null ? ', con una suspensión de ' + pl(dias,'día','días') : '');
+  }
+  const hoy = hoyISO();
+  if(c.fechaFin){
+    const d = diffDias(hoy, c.fechaFin);
+    const rest = d>0 ? 'faltan ' + pl(d,'día','días') : d===0 ? 'termina hoy' : 'venció hace ' + pl(-d,'día','días');
+    return 'Hasta el ' + fmtFecha(c.fechaFin) + ', ' + rest;
+  }
+  return 'Indefinida, ' + pl(mesesTranscurridos(c.fechaInicio, hoy),'mes','meses') + ' desde el inicio';
+}
+
+
+function estadoMiembro(m){ const h = hoyISO(); if(m.hasta && m.hasta < h) return 'fin'; if(m.desde && m.desde > h) return 'futuro'; return 'vigente'; }
+function vigente(m){ return estadoMiembro(m) === 'vigente'; }
+function ordenarMiembros(arr){
+  const o = { vigente:0, futuro:1, fin:2 };
+  return [...arr].sort((a,b) => o[estadoMiembro(a)]-o[estadoMiembro(b)] || a.nombre.localeCompare(b.nombre,'es'));
+}
+function suspensionesDe(personaId, nombre){
+  return disc.filter(c => c.estado==='suspendido' && ((personaId && c.personaId===personaId) || norm(c.nombre)===norm(nombre)));
+}
+function suspendidosDelMinisterio(mi){
+  return disc.filter(c => c.estado==='suspendido' && (c.ministerioId===mi.id || norm(c.ministerio)===norm(mi.nombre)));
+}
+
+// ---------- Alertas ----------
+// Un ministerio activo avisa si: no tiene a nadie con cargo vigente; el período de un cargo ya venció sin reemplazo;
+// o el período de un cargo termina en DIAS_AVISO días o menos y no hay reemplazo previsto.
+function alertasDe(mi){
+  if(mi.estado !== 'activo') return [];
+  const hoy = hoyISO(), dir = mi.directiva || [], out = [];
+  if(!dir.some(vigente)) out.push({ nivel:'vencida', orden:0, dias:-99999, chip:'Sin directiva vigente', texto:'No hay nadie con un cargo vigente en la directiva.' });
+  const grupos = {};
+  dir.forEach(m => { const k = norm(m.rol); (grupos[k] = grupos[k] || []).push(m); });
+  Object.values(grupos).forEach(g => {
+    const vig = g.filter(vigente), futuro = g.some(o => o.desde && o.desde > hoy);
+    if(!vig.length){
+      if(futuro) return;
+      const ult = [...g].sort((a,b) => (b.hasta||'').localeCompare(a.hasta||''))[0];
+      if(ult.hasta && ult.hasta < hoy){
+        const d = diffDias(hoy, ult.hasta);
+        out.push({ nivel:'vencida', orden:1, dias:d, chip:'Período vencido: ' + ult.rol, texto:'El período de ' + ult.nombre + ' como ' + ult.rol + ' terminó hace ' + pl(-d,'día','días') + ' y no hay reemplazo.' });
+      }
+    }else{
+      vig.forEach(v => {
+        if(!v.hasta) return;
+        const d = diffDias(hoy, v.hasta);
+        if(d <= DIAS_AVISO && !futuro && !vig.some(o => o.id!==v.id && (!o.hasta || o.hasta > v.hasta)))
+          out.push({ nivel:'proxima', orden:2, dias:d, chip:v.rol + ': ' + (d===0 ? 'termina hoy' : pl(d,'día','días')),
+            texto:'El período de ' + v.nombre + ' como ' + v.rol + (d===0 ? ' termina hoy.' : ' termina en ' + pl(d,'día','días') + ' (' + fmtFecha(v.hasta) + ').') });
+      });
+    }
+  });
+  return out.sort((a,b) => a.orden-b.orden || a.dias-b.dias);
+}
+
+// ---------- Datos de cada módulo ----------
+function nm(n, l, cls){ return { n, l, cls:cls||'' }; }
+function numsMinutas(){
+  if(cargado.sesiones==='error') return [nm('—','sin acceso a las sesiones')];
+  const y = String(new Date().getFullYear());
+  return [nm(ses.filter(s => (s.fecha||'').startsWith(y)).length, 'sesiones este año'), nm(ses[0] ? fmtFecha(ses[0].fecha) : '—', 'última sesión', 'fecha'), nm(ses.filter(s => s.estado==='borrador').length, 'en borrador')];
+}
+function numsDisciplina(){
+  const susp = disc.filter(c => c.estado==='suspendido').length, al = disc.filter(c => alertaCaso(c)).length;
+  return [nm(susp, 'en suspensión', susp ? 'rojo' : ''), nm(al, 'con alerta', al ? 'ambar' : ''), nm(disc.filter(c => c.estado==='habilitado').length, 'habilitados')];
+}
+function numsMinisterios(){
+  const al = mins.filter(m => alertasDe(m).length).length;
+  return [nm(mins.filter(m => m.estado==='activo').length, 'activos'), nm(al, 'con alerta', al ? 'ambar' : ''), nm(mins.filter(m => m.estado!=='activo').length, 'inactivos')];
+}
+function todasLasAlertas(){
+  const out = [];
+  disc.forEach(c => { const a = alertaCaso(c); if(a) out.push({ mod:'Disciplina', ico:icoAlerta(a.nivel), nivel:a.nivel, orden:a.orden, dias:a.dias, titulo:c.nombre + ', ' + c.ministerio, texto:a.texto, href:'DisciplinaConsejoLocal.html#abrir=' + c.id }); });
+  mins.forEach(m => alertasDe(m).forEach(a => out.push({ mod:'Ministerios', ico:icoAlerta(a.nivel), nivel:a.nivel, orden:a.orden, dias:a.dias, titulo:m.nombre, texto:a.texto, href:'MinisteriosConsejoLocal.html#abrir=' + m.id })));
+  return out.sort((x,y) => x.orden-y.orden || x.dias-y.dias);
+}
+function crucesPersonas(){
+  const out = [];
+  mins.filter(m => m.estado==='activo').forEach(m => (m.directiva||[]).concat(m.integrantes||[]).filter(vigente).forEach(x => {
+    const s = suspensionesDe(x.personaId, x.nombre);
+    if(s.length) out.push({ persona:x.nombre, rol:x.rol, min:m, susp:s });
+  }));
+  return out;
+}
+
+// ---------- Pintado ----------
+function render(){
+  q('modulos').innerHTML = MODULOS.map(m => {
+    const nums = m.nums();
+    return '<a class="mod-card' + (m.futuro?' futuro':'') + '" href="' + m.href + '"><div class="mod-top"><span class="mod-ico">' + ic(m.ico) + '</span><div><div class="mod-t serif">' + esc(m.titulo) + '</div><div class="mod-d">' + esc(m.desc) + '</div></div></div>' +
+      (nums.length ? '<div class="mod-nums">' + nums.map(x => '<div class="mod-num"><div class="n ' + x.cls + '">' + esc(x.n) + '</div><div class="l">' + esc(x.l) + '</div></div>').join('') + '</div>' : '') +
+      '<div class="mod-go">' + (m.futuro ? 'Abrir sistema independiente' : 'Abrir módulo') + '</div></a>';
+  }).join('');
+  const als = todasLasAlertas();
+  const cn = q('conteo-aten'); cn.style.display = als.length ? 'inline-block' : 'none'; cn.textContent = als.length;
+  if(!contado && cargado.disciplina && cargado.ministerios && cargado.personas && cargado.sesiones){ contado = true; SalemUI.contar(q('modulos')); }
+  document.title = (als.length ? '(' + als.length + ') ' : '') + 'Consejo Local, panel principal';
+  const listo = cargado.disciplina && cargado.ministerios;
+  q('atencion').innerHTML = !listo ? '<p class="muted" style="font-size:.9rem;">Cargando…</p>' : als.length
+    ? als.map(a => '<div class="alerta alerta-' + a.nivel + '"><span class="ico">' + a.ico + '</span><div class="txt"><b>' + esc(a.titulo) + ' <span style="font-weight:500;opacity:.75;">(' + a.mod + ')</span></b>' + esc(a.texto) + '</div><a class="btn btn-sm" href="' + a.href + '">Abrir</a></div>').join('')
+    : '<div class="ok-box">' + ic('check') + 'Todo en orden: no hay alertas pendientes.</div>';
+  const cr = listo ? crucesPersonas() : [];
+  q('cruces').innerHTML = cr.length
+    ? '<div class="panel-t"><h2 class="serif">Para revisar</h2></div>' + cr.map(c => '<div class="alerta alerta-indef"><span class="ico">' + ic('prohibido') + '</span><div class="txt"><b>' + esc(c.persona) + '</b>Figura como ' + esc(c.rol) + ' en ' + esc(c.min.nombre) + ' y aparece en suspensión (privilegio: ' + esc(c.susp.map(s => s.ministerio).join(', ')) + ').</div><a class="btn btn-sm" href="MinisteriosConsejoLocal.html#abrir=' + c.min.id + '">Abrir</a></div>').join('')
+    : '';
+  renderBusqueda();
+}
+function renderBusqueda(){
+  const t = norm(q('busq-persona').value), cont = q('res-busqueda');
+  if(t.length < 2){ cont.innerHTML = ''; return; }
+  const mapa = {};
+  const get = n => (mapa[norm(n)] = mapa[norm(n)] || { nombre:n, lineas:[] });
+  mins.forEach(m => [['directiva','Directiva'],['integrantes','Integrante']].forEach(([k,et]) => (m[k]||[]).forEach(x => {
+    if(norm(x.nombre).includes(t)){
+      const e = estadoMiembro(x), est = e==='vigente' ? '' : e==='fin' ? ' (ya no vigente)' : ' (por iniciar)';
+      get(x.nombre).lineas.push('<a href="MinisteriosConsejoLocal.html#abrir=' + m.id + '">' + esc(m.nombre) + '</a>: ' + esc(x.rol) + ' (' + et.toLowerCase() + ')' + est);
+    }
+  })));
+  disc.forEach(c => { if(norm(c.nombre).includes(t)) get(c.nombre).lineas.push('<a href="DisciplinaConsejoLocal.html#abrir=' + c.id + '">Disciplina</a>: ' + (c.estado==='suspendido' ? '<b style="color:var(--susp);">En suspensión</b>' : 'Habilitado') + ', privilegio ' + esc(c.ministerio) + ', desde ' + fmtFecha(c.fechaInicio)); });
+  const res = Object.values(mapa).sort((a,b) => a.nombre.localeCompare(b.nombre,'es'));
+  cont.innerHTML = res.length ? res.map(r => '<div class="res-persona"><div class="fm-nombre">' + esc(r.nombre) + '</div>' + r.lineas.map(l => '<div class="fm-sub">' + l + '</div>').join('') + '</div>').join('') : '<p class="muted" style="font-size:.9rem;">No hay registros con ese nombre en Ministerios ni en Disciplina.</p>';
+}
+function errorFirestore(e){
+  console.error(e);
+  const b = q('banner-error');
+  if(e && e.code === 'permission-denied'){
+    b.innerHTML = '<b>Firestore rechazó el acceso.</b> Verifica que tu correo esté en la lista de autorizados de las reglas de Firestore para las colecciones <b>disciplina</b>, <b>ministerios</b> y <b>personas</b>.';
+  }else{
+    b.textContent = 'Error de conexión con Firestore: ' + (e && e.message ? e.message : e);
+  }
+  b.style.display = 'block';
+}
+
+function msgAuth(e){
+  const m = { 'auth/invalid-credential':'Correo o contraseña incorrectos.', 'auth/wrong-password':'Correo o contraseña incorrectos.', 'auth/user-not-found':'Correo o contraseña incorrectos.',
+    'auth/invalid-email':'El correo no tiene un formato válido.', 'auth/too-many-requests':'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
+    'auth/network-request-failed':'Sin conexión con Firebase. Revisa tu internet.', 'auth/operation-not-allowed':'El inicio de sesión con correo no está habilitado en Firebase (Authentication → Sign-in method).',
+    'auth/user-disabled':'Esta cuenta está deshabilitada.' };
+  return m[e.code] || ('No se pudo iniciar sesión: ' + (e.message || e));
+}
+async function iniciarSesion(){
+  const correo = q('lg-correo').value.trim(), clave = q('lg-clave').value, err = q('lg-error');
+  err.style.display = 'none'; q('login-aviso').textContent = '';
+  if(!correo || !clave){ err.textContent = 'Escribe tu correo y contraseña.'; err.style.display = 'block'; return; }
+  q('lg-btn').disabled = true;
+  try{ await auth.signInWithEmailAndPassword(correo, clave); q('lg-clave').value = ''; }
+  catch(e){ err.textContent = msgAuth(e); err.style.display = 'block'; }
+  q('lg-btn').disabled = false;
+}
+async function recuperarClave(){
+  const correo = q('lg-correo').value.trim(), err = q('lg-error');
+  err.style.display = 'none';
+  if(!correo){ err.textContent = 'Escribe tu correo arriba y vuelve a presionar “Olvidé mi contraseña”.'; err.style.display = 'block'; return; }
+  try{ await auth.sendPasswordResetEmail(correo); q('login-aviso').textContent = 'Si el correo está registrado, te enviamos un enlace para crear una nueva contraseña.'; }
+  catch(e){ err.textContent = msgAuth(e); err.style.display = 'block'; }
+}
+function cerrarSesion(){ auth.signOut(); }
+function reiniciarInactividad(){
+  clearTimeout(inactTimer);
+  if(!usuario) return;
+  inactTimer = setTimeout(() => { q('login-aviso').textContent = 'La sesión se cerró por inactividad (30 minutos).'; auth.signOut(); }, LIMITE_INACTIVIDAD);
+}
+['click','keydown','touchstart','scroll'].forEach(ev => document.addEventListener(ev, reiniciarInactividad, { passive:true }));
+
+(async function start(){
+  // El inicio de sesión de Firebase solo funciona en páginas http(s), no en archivos descargados (file:// o content://).
+  if(location.protocol !== 'http:' && location.protocol !== 'https:'){
+    q('setup-screen').style.display = 'flex';
+    q('setup-error').innerHTML = '<b>Este módulo no puede abrirse como archivo descargado.</b> El inicio de sesión necesita una dirección <b>https://</b>. Publícalo en GitHub Pages (junto a tus otros sistemas) y ábrelo desde esa dirección.';
+    return;
+  }
+  const listo = await asegurarFirebaseCargado();
+  if(!listo){
+    q('setup-screen').style.display = 'flex';
+    q('setup-error').innerHTML = 'No se pudo cargar Firebase desde internet. Casi siempre es un <b>bloqueador de anuncios o extensión</b>, o una <b>red que bloquea gstatic.com y jsdelivr.net</b>. Desactívalo para esta página y recarga.';
+    return;
+  }
+  try{
+    inicializarFirebase(cargarConfigGuardada() || EMBEDDED_FIREBASE_CONFIG);
+    try{ await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); }catch(e){} // la sesión termina al cerrar la pestaña
+    let authListo = false;
+    const guardia = setTimeout(() => {
+      if(authListo) return;
+      q('setup-screen').style.display = 'flex';
+      q('setup-error').innerHTML = '<b>No se pudo verificar la sesión.</b> Abre el módulo desde su dirección https y confirma que el navegador permita almacenamiento y cookies para el sitio.';
+    }, 10000);
+    auth.onAuthStateChanged(user => {
+      authListo = true; clearTimeout(guardia); q('setup-screen').style.display = 'none';
+      if(user){
+        usuario = user; q('usuario-email').textContent = user.email; SalemUI.usuario(user.email);
+        q('login-screen').style.display = 'none'; q('app').style.display = 'block';
+        SalemUI.entrada(); iniciarApp(); reiniciarInactividad();
+      }else{
+        usuario = null; clearTimeout(inactTimer); detenerApp();
+        q('app').style.display = 'none'; q('login-screen').style.display = 'flex';
+      }
+    });
+  }catch(e){
+    q('setup-screen').style.display = 'flex';
+    q('setup-error').textContent = 'No se pudo conectar: ' + e.message;
+  }
+})();
+</script>
+</body>
+</html>
