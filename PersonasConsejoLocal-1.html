@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consejo Local, membresía</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+  // Respaldo: si gstatic.com está bloqueado (extensión, antivirus, red), se reintenta con jsDelivr.
+  function cargarScript(src){
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src; s.onload = resolve;
+      s.onerror = () => reject(new Error('No se pudo cargar: ' + src));
+      document.head.appendChild(s);
+    });
+  }
+  async function asegurarFirebaseCargado(){
+    if(typeof firebase !== 'undefined' && firebase.firestore && firebase.auth) return true;
+    try{
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js');
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.js');
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.js');
+      return typeof firebase !== 'undefined' && !!firebase.firestore && !!firebase.auth;
+    }catch(e){ return false; }
+  }
+</script>
+
+<meta name="theme-color" content="#0f1830">
+<link rel="icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="salem.css">
+<script src="salem-ui.js"></script>
+</head>
+<body>
+
+<!-- Pantalla de error de carga -->
+<div id="setup-screen" class="acceso" style="display:none;">
+  <div class="acceso-card">
+    <span class="medallon"><img src="logo.png" alt="" onerror="SalemUI.logoFallback(this)"></span>
+    <p class="marca-sup2">Iglesia Evangélica Centroamericana</p>
+    <h1 class="serif">Salem</h1>
+    <p class="acceso-sub">No se pudo conectar</p>
+    <p id="setup-error" style="font-size:.9rem;line-height:1.6;color:var(--susp);margin:0;"></p>
+  </div>
+</div>
+
+<!-- Inicio de sesión -->
+<div id="login-screen" class="acceso" style="display:none;">
+  <div class="acceso-card">
+    <span class="medallon"><img src="logo.png" alt="" onerror="SalemUI.logoFallback(this)"></span>
+    <p class="marca-sup2">Iglesia Evangélica Centroamericana</p>
+    <h1 class="serif">Salem</h1>
+    <p class="acceso-sub">Membresía, acceso reservado al Consejo Local</p>
+    <p id="login-aviso" class="acceso-aviso"></p>
+    <div class="campo"><label class="f-label" for="lg-correo">Correo</label><input type="email" class="input" id="lg-correo" autocomplete="username" onkeydown="if(event.key==='Enter')iniciarSesion()"></div>
+    <div class="campo"><label class="f-label" for="lg-clave">Contraseña</label><input type="password" class="input" id="lg-clave" autocomplete="current-password" onkeydown="if(event.key==='Enter')iniciarSesion()"></div>
+    <p class="error-form" id="lg-error"></p>
+    <button class="btn btn-primary btn-lg" id="lg-btn" onclick="iniciarSesion()">Entrar</button>
+    <button class="link" onclick="recuperarClave()">Olvidé mi contraseña</button>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <header class="app-header no-print">
+    <div class="hdr">
+      <a class="marca" href="index.html" aria-label="Ir al inicio">
+        <span class="medallon"><img src="logo.png" alt="" onerror="SalemUI.logoFallback(this)"></span>
+        <span class="marca-txt"><span class="marca-sup">Iglesia Evangélica Centroamericana</span><span class="marca-nom">Salem</span></span>
+      </a>
+      <nav class="modnav" aria-label="Módulos"><a href="index.html">Inicio</a><a href="MinutasConsejoLocal.html">Minutas</a><a href="DisciplinaConsejoLocal.html">Disciplina</a><a href="MinisteriosConsejoLocal.html">Ministerios</a><a href="PersonasConsejoLocal.html" class="actual" aria-current="page">Membresía</a></nav>
+      <div class="acciones">
+        <div class="usuario">
+          <button class="avatar" id="btn-usuario" aria-haspopup="true" aria-expanded="false" aria-label="Menú de usuario" onclick="SalemUI.menu(event)"><span id="usuario-inicial">?</span></button>
+          <div class="menu-usuario" id="menu-usuario" role="menu">
+            <div class="mu-email" id="usuario-email"></div>
+            <button role="menuitem" onclick="cerrarSesion()" data-i="salir">Cerrar sesión</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <div id="banner-error" role="alert"></div>
+    <div class="panel-t"><h2 class="serif">Membresía</h2><span class="conteo" id="conteo-mem" style="display:none;"></span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+      <button class="btn btn-primary btn-sm" onclick="abrirPersona('')">Agregar persona</button>
+      <button class="btn btn-ghost btn-sm" onclick="abrirImport()">Importar de Excel o CSV</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportarCSV()">Exportar</button>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <div class="buscador" style="flex:1;min-width:220px;"><span data-i="buscar"></span><input type="text" id="busq" class="input" autocomplete="off" spellcheck="false" placeholder="Buscar por nombre, teléfono o sector" oninput="render()"></div>
+      <select class="input" id="filtro" style="width:auto;min-width:150px;" onchange="render()"></select>
+    </div>
+    <div id="lista" style="margin-top:12px;"></div>
+    <div id="sin-registrar"></div>
+  </main>
+</div>
+<div class="modal-backdrop no-print" id="modal-persona"><div class="modal-box" style="max-width:720px;">
+  <h3 class="serif" id="mp-titulo">Persona</h3>
+  <div id="mp-campos"></div>
+  <p class="error-form" id="mp-error"></p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+    <button class="btn btn-ghost" id="mp-quitar" onclick="quitarPersona()" style="margin-right:auto;">Quitar de la base</button>
+    <button class="btn btn-ghost" onclick="cerrarModal('modal-persona')">Cancelar</button>
+    <button class="btn btn-primary" id="mp-guardar" onclick="guardarPersona()">Guardar</button>
+  </div>
+</div></div>
+<div class="modal-backdrop no-print" id="modal-ficha"><div class="modal-box" id="ficha-box" style="max-width:720px;"></div></div>
+<div class="modal-backdrop no-print" id="modal-import"><div class="modal-box">
+  <h3 class="serif">Importar membresía</h3>
+  <p class="muted" style="font-size:.85rem;margin-top:-8px;">Archivo Excel (.xlsx, .xls) o CSV con una fila de encabezados. Desde Access, expórtalo a Excel o a texto (CSV). Los nombres que ya existen no se modifican: solo se agregan los nuevos.</p>
+  <div class="campo"><input type="file" id="im-archivo" accept=".xlsx,.xls,.csv,.txt" onchange="elegirArchivo(this)"></div>
+  <p class="muted" id="im-estado" style="font-size:.85rem;"></p>
+  <div id="im-mapeo"></div>
+  <div id="im-previa"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+    <button class="btn btn-ghost" onclick="cerrarModal('modal-import')">Cerrar</button>
+    <button class="btn btn-ghost" id="im-prev-btn" onclick="vistaPrevia()" style="display:none;">Ver vista previa</button>
+    <button class="btn btn-primary" id="im-ok" onclick="confirmarImport()" style="display:none;">Importar</button>
+  </div>
+</div></div>
+<div id="toast-root"></div>
+
+<script>
+// ---------- Conexión (mismo proyecto y misma llave de configuración que Minutas) ----------
+const EMBEDDED_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAPeBr8Rw8Hw5OS0QFIBLdpgFeqaUuzzqs",
+  authDomain: "salem-minutas.firebaseapp.com",
+  projectId: "salem-minutas",
+  storageBucket: "salem-minutas.firebasestorage.app",
+  messagingSenderId: "509496830084",
+  appId: "1:509496830084:web:8865b4265d0065a3333ad1"
+};
+let db = null, auth = null, firebaseConfig = null, usuario = null;
+let unsubs = [], timerConexion = null, inactTimer = null;
+const LIMITE_INACTIVIDAD = 30*60*1000; // 30 minutos
+
+function cargarConfigGuardada(){
+  const raw = localStorage.getItem('minutas_firebase_config');
+  if(!raw) return null;
+  try{ return JSON.parse(raw); }catch(e){ return null; }
+}
+function inicializarFirebase(config){
+  firebase.initializeApp(config);
+  db = firebase.firestore();
+  auth = firebase.auth();
+  // Algunas redes, antivirus o bloqueadores cortan el streaming (WebChannel) de Firestore.
+  // Se fuerza long-polling, que es más lento pero compatible en esos casos.
+  try{ db.settings({ experimentalForceLongPolling:true, useFetchStreams:false, merge:true }); }catch(e){}
+  firebaseConfig = config;
+}
+function olvidarConfiguracion(){
+  if(!confirm('Esto borrará la configuración guardada en este navegador. ¿Continuar?')) return;
+  localStorage.removeItem('minutas_firebase_config');
+  location.reload();
+}
+
+// ---------- Utilidades de texto y fechas ----------
+const q = id => document.getElementById(id);
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function br(s){ return esc(s).replace(/\n/g,'<br>'); }
+function norm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim(); }
+function uid(){ return 'h' + Math.random().toString(36).slice(2,9) + Date.now().toString(36); }
+function pl(n, uno, otros){ return n + ' ' + (n===1 ? uno : otros); }
+
+// Fechas siempre en hora local (evita el desfase de UTC en las tardes de Guatemala)
+function fISO(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function hoyISO(){ return fISO(new Date()); }
+function parseISO(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+function sumarDias(iso, n){ const d = parseISO(iso); d.setDate(d.getDate()+n); return fISO(d); }
+function sumarMeses(iso, n){
+  const d = parseISO(iso), dia = d.getDate();
+  d.setDate(1); d.setMonth(d.getMonth()+n);
+  const ult = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  d.setDate(Math.min(dia, ult));
+  return fISO(d);
+}
+function diffDias(a, b){ return Math.round((parseISO(b) - parseISO(a)) / 86400000); } // b - a
+function mesesTranscurridos(desde, hasta){
+  const a = parseISO(desde), b = parseISO(hasta);
+  let m = (b.getFullYear()-a.getFullYear())*12 + (b.getMonth()-a.getMonth());
+  if(b.getDate() < a.getDate()) m--;
+  return Math.max(0, m);
+}
+function fmtFecha(iso){ if(!iso) return '—'; const d = parseISO(iso); return d.getDate() + ' ' + MESES[d.getMonth()] + ' ' + d.getFullYear(); }
+function calcFin(inicio, n, unidad){
+  if(unidad==='dias') return sumarDias(inicio, n);
+  if(unidad==='semanas') return sumarDias(inicio, n*7);
+  if(unidad==='anios') return sumarMeses(inicio, n*12);
+  return sumarMeses(inicio, n);
+}
+const UNIDADES = { dias:['día','días'], semanas:['semana','semanas'], meses:['mes','meses'], anios:['año','años'] };
+
+function toast(msg, error){
+  const t = document.createElement('div');
+  t.className = 'toast' + (error ? ' err' : ''); t.textContent = msg;
+  q('toast-root').appendChild(t); setTimeout(() => t.remove(), 2600);
+}
+function abrirModal(id){ q(id).style.display = 'flex'; }
+function cerrarModal(id){ q(id).style.display = 'none'; }
+
+
+// ---------- Membresía ----------
+let personas = [], disc = [], mins = [], ses = [], cargado = {}, imp = null, impListo = null, editId = '', pendNombres = [];
+const ESTADOS = ['Activo','Inactivo','Visita','Trasladado','Fallecido'];
+const LIM = 300;
+function autorActual(){ return usuario && usuario.email ? usuario.email : ''; }
+function detenerApp(){
+  unsubs.forEach(u => { try{ u(); }catch(e){} }); unsubs = []; clearTimeout(timerConexion);
+  personas = []; disc = []; mins = []; ses = []; cargado = {};
+}
+function iniciarApp(){
+  detenerApp();
+  q('filtro').innerHTML = '<option value="">Todos los estados</option><option value="_">Sin clasificar</option>' + ESTADOS.map(e => '<option>' + e + '</option>').join('');
+  const sub = (c, f) => unsubs.push(db.collection(c).onSnapshot(snap => {
+    f(snap.docs.map(d => ({ id:d.id, ...d.data() }))); cargado[c] = true; q('banner-error').style.display = 'none'; render();
+  }, errorFirestore));
+  sub('personas', r => { personas = r; }); sub('disciplina', r => { disc = r; }); sub('ministerios', r => { mins = r; });
+  unsubs.push(db.collection('sesiones').orderBy('fecha','desc').limit(200).onSnapshot(snap => {
+    ses = snap.docs.map(d => ({ id:d.id, ...d.data() })); cargado.sesiones = true; render();
+  }, e => { console.warn('Sesiones no disponible:', e); cargado.sesiones = 'error'; render(); }));
+  timerConexion = setTimeout(() => {
+    if(cargado.personas) return;
+    const b = q('banner-error');
+    b.innerHTML = '<b>No se logra conectar con Firestore.</b> Revisa tu conexión y que las reglas incluyan la colección <b>personas</b>.';
+    b.style.display = 'block';
+  }, 10000);
+}
+function errorFirestore(e){
+  console.error(e);
+  const b = q('banner-error');
+  b.innerHTML = e && e.code === 'permission-denied' ? '<b>Firestore rechazó el acceso.</b> Verifica que tu correo esté autorizado en las reglas.' : 'Error de conexión con Firestore: ' + esc(e && e.message ? e.message : e);
+  b.style.display = 'block';
+}
+function vigente(m){ const h = hoyISO(); return !((m.hasta && m.hasta < h) || (m.desde && m.desde > h)); }
+function conteoUsos(){
+  const U = {};
+  const suma = (id, k) => { if(!id) return; (U[id] = U[id] || { d:0, m:0 })[k]++; };
+  disc.forEach(c => suma(c.personaId, 'd'));
+  mins.forEach(m => (m.directiva||[]).concat(m.integrantes||[]).forEach(x => suma(x.personaId, 'm')));
+  return U;
+}
+function render(){
+  if(!cargado.personas){ q('lista').innerHTML = '<p class="muted" style="font-size:.9rem;">Cargando…</p>'; return; }
+  const U = conteoUsos(), t = norm(q('busq').value), f = q('filtro').value;
+  const ps = personas.filter(p => (!f || (f==='_' ? !p.estado : p.estado===f)) && (!t || norm([p.nombre, p.telefono, p.direccion, p.sector].join(' ')).includes(t)))
+    .sort((a,b) => a.nombre.localeCompare(b.nombre,'es'));
+  const cn = q('conteo-mem'); cn.style.display = 'inline-block'; cn.textContent = personas.length;
+  q('lista').innerHTML = ps.length ? ps.slice(0, LIM).map(p => {
+    const u = U[p.id] || { d:0, m:0 }, n = u.d + u.m;
+    const sub = [p.estado, p.telefono, p.direccion || p.sector].filter(Boolean).map(esc).join(' · ');
+    return '<div class="fila-persona" style="cursor:pointer;" role="button" tabindex="0" onclick="verFicha(\'' + p.id + '\')" onkeydown="if(event.key===\'Enter\')verFicha(\'' + p.id + '\')"><div style="min-width:0;"><div>' + esc(p.nombre) + '</div>' + (sub ? '<div class="muted" style="font-size:.78rem;">' + sub + '</div>' : '') + '</div>' +
+      '<span class="cnt">' + (n ? pl(n,'registro','registros') : 'sin registros') + '</span></div>';
+  }).join('') + (ps.length > LIM ? '<p class="muted" style="font-size:.85rem;margin-top:10px;">Se muestran ' + LIM + ' de ' + ps.length + '. Usa el buscador para encontrar a alguien.</p>' : '')
+    : '<p class="muted" style="font-size:.9rem;">' + (personas.length ? 'Nadie coincide con la búsqueda.' : 'Aún no hay personas. Agrega una o importa tu archivo de membresía.') + '</p>';
+  renderSinRegistrar();
+}
+// ---------- Nombres de Minutas que aún no están en la base ----------
+function nombresMinutas(){
+  const m = {}, add = n => { n = String(n||'').trim().replace(/\s+/g,' '); if(n.length > 1 && !m[norm(n)]) m[norm(n)] = n; };
+  ses.forEach(s => {
+    (s.asistencia||[]).forEach(a => add(a && a.nombre)); (s.invitados||[]).forEach(add);
+    ['citados','audiencias'].forEach(k => (s[k]||[]).forEach(i => add(i && i.nombre)));
+  });
+  try{ JSON.parse(localStorage.getItem('minutas_roster')||'[]').forEach(x => add(typeof x === 'string' ? x : x && x.nombre)); }catch(e){}
+  return m;
+}
+function renderSinRegistrar(){
+  const c = q('sin-registrar');
+  if(cargado.sesiones !== true){ c.innerHTML = ''; return; }
+  const ya = new Set(personas.map(p => norm(p.nombre)));
+  pendNombres = Object.entries(nombresMinutas()).filter(([k]) => !ya.has(k)).map(([, v]) => v).sort((a,b) => a.localeCompare(b,'es'));
+  c.innerHTML = pendNombres.length ? '<div class="panel-t"><h2 class="serif">Nombres de Minutas sin registrar</h2><span class="conteo">' + pendNombres.length + '</span></div>' +
+    '<p class="muted" style="font-size:.85rem;margin-top:-6px;">Aparecen en asistencia, invitados, citados o audiencias, pero no están en la membresía. Revísalos antes de agregar.</p>' +
+    '<button class="btn btn-ghost btn-sm" style="margin-bottom:8px;" onclick="agregarPendientes(-1)">Agregar todos</button>' +
+    pendNombres.slice(0, 80).map((n, i) => '<div class="fila-persona"><span>' + esc(n) + '</span><button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="agregarPendientes(' + i + ')">Agregar</button></div>').join('') +
+    (pendNombres.length > 80 ? '<p class="muted" style="font-size:.85rem;">Se muestran 80; al agregar aparecerán los siguientes.</p>' : '') : '';
+}
+async function agregarPendientes(i){
+  const lista = i < 0 ? pendNombres.slice() : [pendNombres[i]];
+  if(i < 0 && !confirm('¿Agregar ' + lista.length + ' nombres a la membresía?')) return;
+  try{ await escribirNuevas(lista.map(n => ({ nombre:n }))); toast('Agregado'); }catch(e){ errorFirestore(e); }
+}
+async function escribirNuevas(arr){
+  for(let k = 0; k < arr.length; k += 400){
+    const b = db.batch();
+    arr.slice(k, k+400).forEach(p => { const d = { creado:Date.now() }; Object.entries(p).forEach(([c, v]) => { if(v) d[c] = v; }); b.set(db.collection('personas').doc(), d); });
+    await b.commit();
+  }
+}
+// ---------- Datos de la persona ----------
+const FORM = [
+  ['nombre','Nombre completo','t',1],['fechaNacimiento','Fecha de nacimiento','d'],['sexo','Sexo','s',['','Femenino','Masculino']],
+  ['estadoCivil','Estado civil','s',['','Soltero/a','Casado/a','Separado/a','Unido/a','Divorciado/a','Viudo/a']],['telefono','Teléfono','t'],
+  ['direccion','Dirección','t',1],['referencia','Referencia','t',1],['profesion','Profesión','t'],['conyuge','Cónyuge','t'],['jefeFamilia','Jefe de familia','b'],
+  ['familia','Familia','t'],['grupoFamiliar','Grupo familiar','t'],['lee','Sabe leer','b'],['estado','Estado','s',['', ...ESTADOS]],
+  ['fechaConversion','Fecha de conversión','d'],['fechaBautismo','Fecha de bautismo','d'],['grupos','Grupos y cargos','t',1],['notas','Notas','a',1]
+];
+function valForm(p, f){ const v = p[f[0]]; if(f[2] === 'b') return v === true ? 'Sí' : v === false ? 'No' : ''; return v == null ? '' : String(v); }
+function campoForm(f, p){
+  const k = f[0], v = valForm(p, f), id = 'mp-' + k;
+  let ctl;
+  if(f[2] === 's' || f[2] === 'b') ctl = '<select class="input" id="' + id + '">' + (f[2] === 'b' ? ['','Sí','No'] : f[3]).map(o => '<option value="' + esc(o) + '"' + (o === v ? ' selected' : '') + '>' + esc(o || '(sin dato)') + '</option>').join('') + '</select>';
+  else if(f[2] === 'a') ctl = '<textarea class="input" id="' + id + '">' + esc(v) + '</textarea>';
+  else ctl = '<input class="input" id="' + id + '" type="' + (f[2] === 'd' ? 'date' : 'text') + '" autocomplete="off" value="' + esc(v) + '">';
+  return '<div class="campo"' + (f[3] === 1 ? ' style="grid-column:1/-1;"' : '') + '><label class="f-label" for="' + id + '">' + f[1] + '</label>' + ctl + '</div>';
+}
+function edadDe(iso){ if(!iso) return ''; const a = Math.floor(mesesTranscurridos(iso, hoyISO()) / 12); return a >= 0 && a < 130 ? a + ' años' : ''; }
+function verFicha(id){
+  const p = personas.find(x => x.id === id); if(!p) return;
+  editId = id;
+  const filas = FORM.filter(f => f[0] !== 'nombre' && f[0] !== 'notas').map(f => {
+    let v = valForm(p, f); if(!v) return null;
+    if(f[2] === 'd') v = fmtFecha(v) + (f[0] === 'fechaNacimiento' && edadDe(p[f[0]]) ? ' (' + edadDe(p[f[0]]) + ')' : '');
+    return [f[1], v];
+  }).filter(Boolean);
+  if(p.sector) filas.push(['Sector', p.sector]);
+  const casos = disc.filter(c => c.personaId === id);
+  const cargos = []; mins.forEach(m => (m.directiva||[]).concat(m.integrantes||[]).forEach(x => { if(x.personaId === id) cargos.push(m.nombre + (x.rol ? ', ' + x.rol : '') + (vigente(x) ? '' : ' (no vigente)')); }));
+  q('ficha-box').innerHTML = '<h3 class="serif" style="margin-bottom:4px;">' + esc(p.nombre) + '</h3>' + (p.estado ? '<p class="muted" style="margin:0 0 14px;font-size:.85rem;">' + esc(p.estado) + '</p>' : '<div style="height:14px;"></div>') +
+    (filas.length ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 18px;">' + filas.map(r => '<div><div class="muted" style="font-size:.72rem;font-weight:600;">' + esc(r[0]) + '</div><div style="font-size:.92rem;">' + esc(r[1]) + '</div></div>').join('') + '</div>' : '<p class="muted" style="font-size:.9rem;">Esta persona solo tiene el nombre registrado.</p>') +
+    (p.notas ? '<div style="margin-top:14px;"><div class="muted" style="font-size:.72rem;font-weight:600;">Notas</div><div style="font-size:.9rem;">' + br(p.notas) + '</div></div>' : '') +
+    ((casos.length || cargos.length) ? '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line-2);"><div class="muted" style="font-size:.72rem;font-weight:600;margin-bottom:6px;">En otros módulos</div>' +
+      casos.map(c => '<div style="font-size:.88rem;"><a href="DisciplinaConsejoLocal.html#abrir=' + c.id + '">Disciplina</a>: ' + (c.estado === 'suspendido' ? '<b style="color:var(--susp);">en suspensión</b>' : 'habilitado') + ', ' + esc(c.ministerio) + '</div>').join('') +
+      cargos.map(t => '<div style="font-size:.88rem;">Ministerios: ' + esc(t) + '</div>').join('') + '</div>' : '') +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;"><button class="btn btn-ghost" onclick="cerrarModal(\'modal-ficha\')">Cerrar</button><button class="btn btn-primary" onclick="cerrarModal(\'modal-ficha\');abrirPersona(editId)">Editar</button></div>';
+  abrirModal('modal-ficha');
+}
+function abrirPersona(id){
+  editId = id; const p = personas.find(x => x.id === id) || {}, U = conteoUsos()[id] || { d:0, m:0 };
+  q('mp-titulo').textContent = id ? 'Editar persona' : 'Agregar persona';
+  q('mp-campos').innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:0 14px;">' + FORM.map(f => campoForm(f, p)).join('') + '</div>';
+  q('mp-error').style.display = 'none'; q('mp-quitar').style.display = id && !(U.d + U.m) ? '' : 'none';
+  abrirModal('modal-persona'); q('mp-nombre').focus();
+}
+function leerForm(){
+  const d = {};
+  FORM.forEach(f => { let v = q('mp-' + f[0]).value.trim(); if(f[0] === 'nombre') v = v.replace(/\s+/g, ' '); d[f[0]] = f[2] === 'b' ? (v === 'Sí' ? true : v === 'No' ? false : null) : v; });
+  return d;
+}
+async function guardarPersona(){
+  const d = leerForm(), nombre = d.nombre, err = q('mp-error');
+  const fallo = m => { err.textContent = m; err.style.display = 'block'; };
+  err.style.display = 'none';
+  if(!nombre) return fallo('Escribe el nombre.');
+  if(personas.some(p => p.id !== editId && norm(p.nombre) === norm(nombre) && (!p.fechaNacimiento || !d.fechaNacimiento || p.fechaNacimiento === d.fechaNacimiento))) return fallo('Ya existe una persona con ese nombre. Si es otra persona, indica su fecha de nacimiento (y la de la otra) para distinguirlas.');
+  q('mp-guardar').disabled = true;
+  try{
+    if(!editId){
+      const datos = { creado:Date.now(), actualizado:Date.now() }; Object.entries(d).forEach(([k, v]) => { if(v !== '' && v !== null) datos[k] = v; });
+      await db.collection('personas').add(datos);
+    }else{
+      const p = personas.find(x => x.id === editId), b = db.batch(), del = firebase.firestore.FieldValue.delete();
+      const datos = { actualizado:Date.now() }; Object.entries(d).forEach(([k, v]) => { datos[k] = (v === '' || v === null) ? del : v; }); datos.nombre = nombre;
+      b.update(db.collection('personas').doc(editId), datos);
+      if(p && p.nombre !== nombre){
+        const casos = disc.filter(c => c.personaId === editId);
+        const mm = mins.filter(m => (m.directiva||[]).concat(m.integrantes||[]).some(x => x.personaId === editId));
+        if(casos.length + mm.length && !confirm('Este nombre aparece en ' + pl(casos.length,'caso de Disciplina','casos de Disciplina') + ' y ' + pl(mm.length,'ministerio','ministerios') + '. Se cambiará también ahí. Los textos escritos a mano en Minutas y en los historiales no se modifican. ¿Continuar?')){ q('mp-guardar').disabled = false; return; }
+        casos.forEach(c => b.update(db.collection('disciplina').doc(c.id), { nombre }));
+        mm.forEach(m => {
+          const cambio = k => Array.isArray(m[k]) ? m[k].map(x => x.personaId === editId ? { ...x, nombre } : x) : null, u = {};
+          ['directiva','integrantes'].forEach(k => { const v = cambio(k); if(v) u[k] = v; });
+          b.update(db.collection('ministerios').doc(m.id), u);
+        });
+      }
+      await b.commit();
+    }
+    cerrarModal('modal-persona'); toast('Guardado');
+  }catch(e){ fallo('No se pudo guardar: ' + (e.message || e)); }
+  q('mp-guardar').disabled = false;
+}
+async function quitarPersona(){
+  const U = conteoUsos()[editId];
+  if(U && (U.d + U.m)) return toast('Tiene registros, no se puede quitar.', true);
+  if(!confirm('¿Quitar a esta persona de la base?')) return;
+  try{ await db.collection('personas').doc(editId).delete(); cerrarModal('modal-persona'); }catch(e){ errorFirestore(e); }
+}
+// ---------- Importar ----------
+function abrirImport(){
+  imp = null; impListo = null; q('im-archivo').value = ''; q('im-estado').textContent = ''; q('im-mapeo').innerHTML = ''; q('im-previa').innerHTML = '';
+  q('im-prev-btn').style.display = 'none'; q('im-ok').style.display = 'none'; abrirModal('modal-import');
+}
+function cargarXLSX(){ return window.XLSX ? Promise.resolve() : cargarScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); }
+async function elegirArchivo(inp){
+  const f = inp.files[0]; if(!f) return;
+  const st = q('im-estado'); st.textContent = 'Leyendo el archivo…'; q('im-previa').innerHTML = ''; q('im-ok').style.display = 'none'; impListo = null;
+  try{
+    await cargarXLSX();
+    const buf = await f.arrayBuffer(); let wb;
+    if(/\.(csv|txt)$/i.test(f.name)){
+      let txt; try{ txt = new TextDecoder('utf-8', { fatal:true }).decode(buf); }catch(e){ txt = new TextDecoder('windows-1252').decode(buf); }
+      const l1 = txt.split(/\r?\n/)[0] || '', cuenta = c => l1.split(c).length - 1;
+      const FS = [';','\t',','].sort((a,b) => cuenta(b) - cuenta(a))[0];
+      wb = XLSX.read(txt, { type:'string', FS });
+    }else wb = XLSX.read(buf, { type:'array' });
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'', raw:false }).filter(r => r.some(c => String(c).trim()));
+    if(filas.length < 2) throw new Error('el archivo no tiene filas de datos.');
+    imp = { cab:filas[0].map(String), filas:filas.slice(1) };
+    st.textContent = pl(imp.filas.length, 'fila', 'filas') + ' encontradas. Indica qué columna es cada dato.';
+    armarMapeo();
+  }catch(e){ imp = null; q('im-mapeo').innerHTML = ''; q('im-prev-btn').style.display = 'none'; st.textContent = 'No se pudo leer el archivo: ' + (e.message || e); }
+}
+const CAMPOS = [['nombre','Nombre(s) o nombre completo',/nombre/],['apellido','Apellido(s), si van aparte',/apellido/],['fechaNacimiento','Fecha de nacimiento',/nacim|natalicio/],['sexo','Sexo',/sexo/],
+  ['estadoCivil','Estado civil',/estado civil/],['telefono','Teléfono',/tel|cel|movil/],['direccion','Dirección',/direcc|colonia|barrio|sector/],['referencia','Referencia',/referen/],
+  ['profesion','Profesión',/profes|oficio/],['conyuge','Cónyuge',/conyug/],['jefeFamilia','Jefe de familia',/jefe/],['familia','Familia',/^familia$/],['grupoFamiliar','Grupo familiar',/grupo fam/],
+  ['lee','Sabe leer',/leer|^lee$/],['estado','Estado',/^estado$|situacion/],['fechaConversion','Fecha de conversión',/conversi/],['fechaBautismo','Fecha de bautismo',/bautis/],
+  ['grupos','Grupos y cargos',/grupos/],['notas','Notas',/nota|observ/],['idAccess','ID en Access',/^id\b/]];
+function armarMapeo(){
+  const cab = imp.cab.map(norm), usado = new Set(), g = {};
+  CAMPOS.forEach(([k,, re]) => { const i = cab.findIndex((h, j) => !usado.has(j) && re.test(h) && !(k === 'nombre' && /apellido/.test(h))); g[k] = i; if(i >= 0) usado.add(i); });
+  const sel = ([k, lab]) => '<div class="campo"><label class="f-label" for="im-' + k + '">' + lab + '</label><select class="input" id="im-' + k + '" onchange="invalidarPrevia()"><option value="-1">(ninguna)</option>' +
+    imp.cab.map((h, i) => '<option value="' + i + '"' + (i === g[k] ? ' selected' : '') + '>' + esc(h || 'Columna ' + (i+1)) + '</option>').join('') + '</select></div>';
+  q('im-mapeo').innerHTML = '<details' + (g.nombre < 0 ? ' open' : '') + '><summary style="cursor:pointer;font-size:.88rem;margin-bottom:10px;">Columnas detectadas: ' + usado.size + ' de ' + CAMPOS.length + ' (tocar para revisar)</summary><div class="grid2">' + CAMPOS.map(sel).join('') + '</div></details>';
+  q('im-prev-btn').style.display = ''; invalidarPrevia();
+}
+function invalidarPrevia(){ impListo = null; q('im-previa').innerHTML = ''; q('im-ok').style.display = 'none'; }
+function fechaISO(v){
+  v = String(v || '').trim(); if(/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+  const m = v.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/); if(!m) return '';
+  let d = +m[1], mo = +m[2]; if(mo > 12 && d <= 12){ const t = d; d = mo; mo = t; } if(mo > 12 || d > 31) return '';
+  return m[3] + '-' + String(mo).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+}
+// Calcula qué se agregaría y qué se completaría. Nunca sobrescribe datos existentes: solo llena campos vacíos.
+function planImport(){
+  const col = {}; CAMPOS.forEach(([k]) => { col[k] = parseInt(q('im-' + k).value, 10); });
+  const val = (r, k) => col[k] >= 0 ? String(r[col[k]] == null ? '' : r[col[k]]).trim().replace(/\s+/g,' ') : '';
+  const filas = imp.filas.map(r => {
+    const nom = (val(r,'nombre') + ' ' + val(r,'apellido')).trim(); if(!nom) return null;
+    const o = { nombre:nom };
+    CAMPOS.forEach(([k]) => {
+      if(k === 'nombre' || k === 'apellido') return; let v = val(r, k); if(!v) return;
+      if(k.startsWith('fecha')) v = fechaISO(v);
+      else if(k === 'jefeFamilia' || k === 'lee') v = /^(s[ií]|1|true|verdadero|x)$/i.test(v) ? true : /^(no|0|false|falso)$/i.test(v) ? false : '';
+      else if(k === 'estado') v = ESTADOS.find(e => norm(e) === norm(v)) || '';
+      if(v !== '') o[k] = v;
+    });
+    return o;
+  });
+  const porNombre = {}, cuenta = {};
+  personas.forEach(p => (porNombre[norm(p.nombre)] = porNombre[norm(p.nombre)] || []).push(p));
+  filas.forEach(o => { if(o){ const k = norm(o.nombre); cuenta[k] = (cuenta[k] || 0) + 1; } });
+  const vistos = new Set(), nuevas = [], compl = [], ambiguos = []; let rep = 0, ya = 0, vac = 0;
+  filas.forEach(o => {
+    if(!o){ vac++; return; }
+    const k = norm(o.nombre), clave = k + '|' + (o.fechaNacimiento || ''); if(vistos.has(clave)){ rep++; return; } vistos.add(clave);
+    const cands = porNombre[k] || []; let m = cands.find(p => p.fechaNacimiento && p.fechaNacimiento === o.fechaNacimiento);
+    if(!m && cands.length){
+      const sinF = cands.filter(p => !p.fechaNacimiento);
+      if(!o.fechaNacimiento) m = cands.length === 1 ? cands[0] : null;
+      else if(sinF.length === 1 && cuenta[k] === 1) m = sinF[0];
+      if(!m && (!o.fechaNacimiento || sinF.length)){ ambiguos.push(o.nombre); return; }
+    }
+    if(m){
+      const upd = {}; Object.entries(o).forEach(([c, v]) => { if(c !== 'nombre' && (m[c] === undefined || m[c] === null || m[c] === '')) upd[c] = v; });
+      if(Object.keys(upd).length) compl.push({ id:m.id, upd }); else ya++;
+      return;
+    }
+    nuevas.push(o);
+  });
+  return { nuevas, compl, ambiguos, rep, ya, vac };
+}
+function vistaPrevia(){
+  if(parseInt(q('im-nombre').value, 10) < 0){ q('im-previa').innerHTML = '<p class="error-form" style="display:block;">Elige la columna del nombre.</p>'; return; }
+  const r = planImport(); impListo = r; const total = r.nuevas.length + r.compl.length;
+  q('im-previa').innerHTML = '<div class="ok-box" style="display:block;">Se agregarán <b>' + r.nuevas.length + '</b> personas nuevas y se completarán datos vacíos de <b>' + r.compl.length + '</b> que ya existían (nada se sobrescribe).' +
+    '<div class="muted" style="font-size:.82rem;margin-top:6px;">Sin cambios: ' + r.ya + ' ya existían. Omitidas: ' + r.rep + ' repetidas en el archivo, ' + r.vac + ' sin nombre, ' + r.ambiguos.length + ' ambiguas (mismo nombre que alguien ya registrado, no se puede saber si es la misma persona).</div></div>' +
+    (r.ambiguos.length ? '<p class="muted" style="font-size:.82rem;margin-top:8px;">Ambiguas, para revisar a mano: ' + r.ambiguos.slice(0, 8).map(esc).join(', ') + (r.ambiguos.length > 8 ? '…' : '') + '</p>' : '') +
+    (r.nuevas.length ? '<p class="muted" style="font-size:.82rem;margin-top:8px;">Ejemplos de nuevas: ' + r.nuevas.slice(0, 5).map(p => esc(p.nombre)).join(', ') + (r.nuevas.length > 5 ? '…' : '') + '</p>' : '');
+  q('im-ok').style.display = total ? '' : 'none'; q('im-ok').textContent = 'Importar ' + total;
+}
+async function confirmarImport(){
+  if(!impListo) return;
+  const plan = planImport(), ops = plan.nuevas.map(o => ({ o })).concat(plan.compl.map(c => ({ c })));
+  if(!ops.length) return;
+  q('im-ok').disabled = true;
+  try{
+    for(let k = 0; k < ops.length; k += 400){
+      const b = db.batch();
+      ops.slice(k, k + 400).forEach(x => { if(x.o) b.set(db.collection('personas').doc(), { ...x.o, creado:Date.now() }); else b.update(db.collection('personas').doc(x.c.id), { ...x.c.upd, actualizado:Date.now() }); });
+      await b.commit();
+    }
+    toast(pl(plan.nuevas.length, 'persona nueva', 'personas nuevas') + ' y ' + pl(plan.compl.length, 'completada', 'completadas')); cerrarModal('modal-import');
+  }catch(e){ errorFirestore(e); }
+  q('im-ok').disabled = false;
+}
+// ---------- Exportar ----------
+function exportarCSV(){
+  const U = conteoUsos(), cel = v => '"' + String(v == null ? '' : v).replace(/"/g,'""') + '"';
+  const filas = [FORM.map(f => f[1]).concat(['ID en Access','Casos en Disciplina','Cargos en Ministerios'])]
+    .concat([...personas].sort((a,b) => a.nombre.localeCompare(b.nombre,'es')).map(p => { const u = U[p.id] || { d:0, m:0 }; return FORM.map(f => valForm(p, f)).concat([p.idAccess || '', u.d, u.m]); }));
+  const blob = new Blob(['\ufeff' + filas.map(r => r.map(cel).join(',')).join('\r\n')], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'membresia-' + hoyISO() + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+}
+function msgAuth(e){
+  const m = { 'auth/invalid-credential':'Correo o contraseña incorrectos.', 'auth/wrong-password':'Correo o contraseña incorrectos.', 'auth/user-not-found':'Correo o contraseña incorrectos.',
+    'auth/invalid-email':'El correo no tiene un formato válido.', 'auth/too-many-requests':'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
+    'auth/network-request-failed':'Sin conexión con Firebase. Revisa tu internet.', 'auth/operation-not-allowed':'El inicio de sesión con correo no está habilitado en Firebase (Authentication → Sign-in method).',
+    'auth/user-disabled':'Esta cuenta está deshabilitada.' };
+  return m[e.code] || ('No se pudo iniciar sesión: ' + (e.message || e));
+}
+async function iniciarSesion(){
+  const correo = q('lg-correo').value.trim(), clave = q('lg-clave').value, err = q('lg-error');
+  err.style.display = 'none'; q('login-aviso').textContent = '';
+  if(!correo || !clave){ err.textContent = 'Escribe tu correo y contraseña.'; err.style.display = 'block'; return; }
+  q('lg-btn').disabled = true;
+  try{ await auth.signInWithEmailAndPassword(correo, clave); q('lg-clave').value = ''; }
+  catch(e){ err.textContent = msgAuth(e); err.style.display = 'block'; }
+  q('lg-btn').disabled = false;
+}
+async function recuperarClave(){
+  const correo = q('lg-correo').value.trim(), err = q('lg-error');
+  err.style.display = 'none';
+  if(!correo){ err.textContent = 'Escribe tu correo arriba y vuelve a presionar “Olvidé mi contraseña”.'; err.style.display = 'block'; return; }
+  try{ await auth.sendPasswordResetEmail(correo); q('login-aviso').textContent = 'Si el correo está registrado, te enviamos un enlace para crear una nueva contraseña.'; }
+  catch(e){ err.textContent = msgAuth(e); err.style.display = 'block'; }
+}
+function cerrarSesion(){ auth.signOut(); }
+function reiniciarInactividad(){
+  clearTimeout(inactTimer);
+  if(!usuario) return;
+  inactTimer = setTimeout(() => { q('login-aviso').textContent = 'La sesión se cerró por inactividad (30 minutos).'; auth.signOut(); }, LIMITE_INACTIVIDAD);
+}
+['click','keydown','touchstart','scroll'].forEach(ev => document.addEventListener(ev, reiniciarInactividad, { passive:true }));
+
+(async function start(){
+  // El inicio de sesión de Firebase solo funciona en páginas http(s), no en archivos descargados (file:// o content://).
+  if(location.protocol !== 'http:' && location.protocol !== 'https:'){
+    q('setup-screen').style.display = 'flex';
+    q('setup-error').innerHTML = '<b>Este módulo no puede abrirse como archivo descargado.</b> El inicio de sesión necesita una dirección <b>https://</b>. Publícalo en GitHub Pages (junto a tus otros sistemas) y ábrelo desde esa dirección.';
+    return;
+  }
+  const listo = await asegurarFirebaseCargado();
+  if(!listo){
+    q('setup-screen').style.display = 'flex';
+    q('setup-error').innerHTML = 'No se pudo cargar Firebase desde internet. Casi siempre es un <b>bloqueador de anuncios o extensión</b>, o una <b>red que bloquea gstatic.com y jsdelivr.net</b>. Desactívalo para esta página y recarga.';
+    return;
+  }
+  try{
+    inicializarFirebase(cargarConfigGuardada() || EMBEDDED_FIREBASE_CONFIG);
+    try{ await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); }catch(e){} // la sesión termina al cerrar la pestaña
+    let authListo = false;
+    const guardia = setTimeout(() => {
+      if(authListo) return;
+      q('setup-screen').style.display = 'flex';
+      q('setup-error').innerHTML = '<b>No se pudo verificar la sesión.</b> Abre el módulo desde su dirección https y confirma que el navegador permita almacenamiento y cookies para el sitio.';
+    }, 10000);
+    auth.onAuthStateChanged(user => {
+      authListo = true; clearTimeout(guardia); q('setup-screen').style.display = 'none';
+      if(user){
+        usuario = user; q('usuario-email').textContent = user.email; SalemUI.usuario(user.email);
+        q('login-screen').style.display = 'none'; q('app').style.display = 'block';
+        SalemUI.entrada(); iniciarApp(); reiniciarInactividad();
+      }else{
+        usuario = null; clearTimeout(inactTimer); detenerApp();
+        q('app').style.display = 'none'; q('login-screen').style.display = 'flex';
+      }
+    });
+  }catch(e){
+    q('setup-screen').style.display = 'flex';
+    q('setup-error').textContent = 'No se pudo conectar: ' + e.message;
+  }
+})();
+</script>
+</body>
+</html>
