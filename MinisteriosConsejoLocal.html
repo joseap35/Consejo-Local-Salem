@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ministerios y grupos del Consejo Local</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+  // Respaldo: si gstatic.com está bloqueado (extensión, antivirus, red), se reintenta con jsDelivr.
+  function cargarScript(src){
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src; s.onload = resolve;
+      s.onerror = () => reject(new Error('No se pudo cargar: ' + src));
+      document.head.appendChild(s);
+    });
+  }
+  async function asegurarFirebaseCargado(){
+    if(typeof firebase !== 'undefined' && firebase.firestore && firebase.auth) return true;
+    try{
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js');
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.js');
+      await cargarScript('https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.js');
+      return typeof firebase !== 'undefined' && !!firebase.firestore && !!firebase.auth;
+    }catch(e){ return false; }
+  }
+</script>
+
+<meta name="theme-color" content="#0f1830">
+<link rel="icon" href="logo.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Consejo Local">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script>if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){ window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); }</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="salem.css">
+<script src="salem-ui.js"></script>
+<style id="mi-estilos">
+/* ===== Organización por tipo e historial desplegable ===== */
+.tabs-tipo{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0 16px;border-bottom:1px solid var(--line-2,#e7e1cf);}
+.tabt{display:inline-flex;align-items:center;gap:8px;padding:10px 15px;border:none;background:none;font:inherit;font-size:.9rem;font-weight:600;color:var(--muted,#6b7280);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px;transition:color .2s,border-color .25s,background .2s;border-radius:8px 8px 0 0;}
+.tabt:hover{color:var(--navy,#14224f);background:rgba(184,146,58,.08);} .tabt.on{color:var(--navy,#14224f);border-bottom-color:#b8923a;}
+.tabt .tn{font-size:.7rem;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--paper-2,#efe9d6);color:var(--muted,#6b7280);} .tabt.on .tn{background:var(--navy,#14224f);color:#fff;}
+.sec-tipo{margin-bottom:20px;} .sec-h{display:flex;align-items:center;gap:12px;width:100%;padding:8px 4px 10px;border:none;background:none;font:inherit;cursor:pointer;text-align:left;border-bottom:2px solid #e2c67e;margin-bottom:10px;color:var(--navy,#14224f);}
+.sec-h .sec-t{font-size:1.25rem;font-weight:600;} .sec-h .sec-n{font-size:.74rem;font-weight:700;padding:2px 10px;border-radius:999px;background:var(--paper-2,#efe9d6);color:var(--muted,#6b7280);} .sec-h .sec-ico{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--navy,#14224f);color:#e2c67e;} .sec-h .sec-ico .ic{width:17px;height:17px;} .sec-h .chev{margin-left:auto;}
+.chev{width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);transition:transform .3s;flex-shrink:0;margin-top:-3px;} .abierto>.chev,.abierto .chev.g{transform:rotate(-135deg);margin-top:3px;}
+.acc-cuerpo{display:grid;grid-template-rows:1fr;transition:grid-template-rows .38s cubic-bezier(.2,.7,.2,1);} .acc-cuerpo.cerrado{grid-template-rows:0fr;} .acc-cuerpo>.in{overflow:hidden;min-height:0;} .acc-cuerpo.cerrado>.in{visibility:hidden;}
+.acc-b{display:flex;align-items:center;gap:10px;width:100%;padding:11px 16px;border:1px solid var(--line-2,#e7e1cf);border-radius:12px;background:#fff;font:inherit;cursor:pointer;text-align:left;color:var(--navy,#14224f);transition:border-color .2s,box-shadow .25s,background .2s;}
+.acc-b:hover{border-color:#b8923a;background:#fffaf0;} .acc-b .acc-t{font-weight:700;font-size:1.05rem;} .acc-b .acc-s{font-size:.8rem;color:var(--muted,#6b7280);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .acc-b .sec-n{font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--paper-2,#efe9d6);color:var(--muted,#6b7280);}
+.acc-b.mini{padding:8px 14px;margin:8px 0;font-size:.85rem;} .acc-b.mini .acc-t{font-size:.86rem;}
+.te{border:1px solid var(--line-2,#e7e1cf);border-radius:12px;background:#fff;margin-bottom:6px;overflow:hidden;transition:border-color .2s;} .te:hover{border-color:#d9c58a;}
+.te-h{display:flex;align-items:center;gap:10px;width:100%;padding:9px 14px;border:none;background:none;font:inherit;cursor:pointer;text-align:left;color:inherit;} .te-f{font-size:.78rem;font-weight:700;color:#8a6a1f;min-width:88px;} .te-r{flex:1;min-width:0;font-size:.86rem;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.te-b{padding:2px 16px 14px 16px;border-top:1px dashed var(--line-2,#e7e1cf);} .te-m{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0 6px;font-size:.78rem;color:var(--muted,#6b7280);}
+.hist-nuevo{margin-top:10px;}
+.inf-chk{display:flex;align-items:center;gap:8px;font-size:.86rem;padding:3px 0;cursor:pointer;} .inf-chk input{width:16px;height:16px;accent-color:var(--navy,#14224f);flex-shrink:0;} .inf-sec{font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8a6a1f;margin:16px 0 8px;}
+#inf-lista{max-height:200px;overflow-y:auto;border:1px solid var(--line-2,#e7e1cf);border-radius:10px;padding:6px 12px;background:#fff;} .inf-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;} @media (max-width:620px){.inf-cols{grid-template-columns:1fr;} .te-f{min-width:74px;}}
+@media print{.acc-cuerpo.cerrado{grid-template-rows:1fr!important;} .acc-cuerpo.cerrado>.in{visibility:visible!important;} .te-r{white-space:normal;} .te{break-inside:avoid;}}
+@media (prefers-reduced-motion:reduce){.acc-cuerpo,.chev{transition:none!important;}}
+</style>
+</head>
+<body>
+
+<!-- Pantalla de error de carga -->
+<div id="setup-screen" class="acceso" style="display:none;">
+  <div class="acceso-card">
+    <span class="medallon"><img src="logo.png" alt="" onerror="SalemUI.logoFallback(this)"></span>
+    <p class="marca-sup2">Iglesia Evangélica Centroamericana</p>
+    <h1 class="serif">Salem</h1>
+    <p class="acceso-sub">No se pudo conectar</p>
+    <p id="setup-error" style="font-size:.9rem;line-height:1.6;color:var(--susp);margin:0;"></p>
+  </div>
+</div>
+
+<!-- Inicio de sesión -->
+<div id="login-screen" class="acceso" style="display:none;">
+  <div class="acceso-card">
+    <span class="medallon"><img src="logo.png" alt="" onerror="SalemUI.logoFallback(this)"></span>
+    <p class="marca-sup2">Iglesia Evangélica Centroamericana</p>
+    <h1 class="serif">Salem</h1>
+    <p class="acceso-sub">Ministerios y grupos, acceso reservado al Consejo Local</p>
+    <p id="login-aviso" class="acceso-aviso"></p>
+    <div class="campo"><label class="f-label" for="lg-correo">Correo</label><input type="email" class="input" id="lg-correo" autocomplete="username" onkeydown="if(event.key==='Enter')iniciarSesion()"></div>
+    <div class="campo"><label class="f-label" for="lg-clave">Contraseña</label><input type="password" class="input" id="lg-clave" autocomplete="current-password" onkeydown="if(event.key==='Enter')iniciarSesion()"></div>
+    <p class="error-form" id="lg-error"></p>
+    <button class="btn btn-primary btn-lg" id="lg-btn" onclick="iniciarSesion()">Entrar</button>
+    <button class="link" onclick="recuperarClave()">Olvidé mi contraseña</button>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <header class="app-header no-print">
+    <div class="hdr">
+      <a class="marca" href="index.html" aria-label="Ir al inicio">
+        <span class="medallon"><img src="logo.png" alt="" onerror="SalemUI.logoFallback(this)"></span>
+        <span class="marca-txt"><span class="marca-sup">Iglesia Evangélica Centroamericana</span><span class="marca-nom">Salem</span></span>
+      </a>
+      <nav class="modnav" aria-label="Módulos"><a href="index.html">Inicio</a><a href="MinutasConsejoLocal.html">Minutas</a><a href="DisciplinaConsejoLocal.html">Disciplina</a><a href="MinisteriosConsejoLocal.html" class="actual" aria-current="page">Ministerios</a></nav>
+      <div class="acciones">
+        <div class="usuario">
+          <button class="avatar" id="btn-usuario" aria-haspopup="true" aria-expanded="false" aria-label="Menú de usuario" onclick="SalemUI.menu(event)"><span id="usuario-inicial">?</span></button>
+          <div class="menu-usuario" id="menu-usuario" role="menu">
+            <div class="mu-email" id="usuario-email"></div>
+            <button role="menuitem" onclick="SalemUI.cerrarMenu();abrirAjustes()" data-i="personas">Personas y conexión</button>
+            <button role="menuitem" onclick="cerrarSesion()" data-i="salir">Cerrar sesión</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div id="banner-error" role="alert"></div>
+
+    <div id="vista-lista">
+      <div class="pagina-t no-print"><div><h1 class="serif">Ministerios y grupos</h1><p>Directiva, integrantes e historial de cada ministerio o grupo.</p></div><button class="btn btn-gold" onclick="abrirModalMin()" data-i="mas">Nuevo ministerio o grupo</button></div>
+      <div class="filete no-print"></div>
+      <div class="stats no-print" id="resumen"></div>
+      <div id="alertas" style="margin-top:16px;"></div>
+      <div class="no-print" style="display:flex;gap:10px;margin:18px 0 12px;flex-wrap:wrap;">
+        <input type="search" id="busq" autocomplete="off" class="input" style="flex:1;min-width:200px;" placeholder="Buscar por nombre, líder, integrante, lugar o texto del historial…" oninput="busqueda=this.value;renderLista()">
+        
+        <button class="btn btn-gold" onclick="abrirInforme()" data-i="imprimir">Informe PDF</button>
+        <button class="btn btn-ghost" onclick="exportarCSV()" data-i="descargar">CSV</button>
+        <button class="btn btn-ghost" onclick="exportarRespaldo()" title="Incluye directiva, integrantes e historial" data-i="respaldo">Respaldo completo</button>
+      </div>
+      <div class="tabs-tipo no-print" id="tabs-tipo"></div>
+      <div id="lista"><div class="skel-lista"><div class="skel-card"></div><div class="skel-card"></div><div class="skel-card"></div></div></div>
+    </div>
+
+    <div id="vista-detalle" style="display:none;"></div>
+  </main>
+</div>
+
+<!-- MODAL: ministerio / grupo -->
+<div class="modal-backdrop no-print" id="modal-min">
+  <div class="modal-box">
+    <h3 class="serif" id="mm-titulo">Nuevo ministerio o grupo</h3>
+    <div class="grid2">
+      <div class="campo"><label class="f-label" for="mm-nombre">Nombre</label><input class="input" id="mm-nombre" autocomplete="off" placeholder="Ej. Sociedad de Jóvenes"></div>
+      <div class="campo"><label class="f-label" for="mm-tipo">Tipo</label>
+        <select class="input" id="mm-tipo"><option value="ministerio">Ministerio</option><option value="sociedad">Sociedad</option><option value="grupo">Grupo familiar</option><option value="comite">Comité</option><option value="otro">Otro</option></select></div>
+    </div>
+    <div class="campo"><label class="f-label" for="mm-proposito">Propósito o descripción</label><textarea class="input" id="mm-proposito" rows="3" placeholder="A qué se dedica este ministerio o grupo"></textarea></div>
+    <div class="grid2">
+      <div class="campo"><label class="f-label" for="mm-fundacion">Fecha de fundación (opcional)</label><input type="date" class="input" id="mm-fundacion"></div>
+      <div class="campo"><label class="f-label" for="mm-lugar">Lugar de reunión</label><input class="input" id="mm-lugar" autocomplete="off" placeholder="Ej. Salón principal"></div>
+    </div>
+    <div class="grid2">
+      <div class="campo"><label class="f-label" for="mm-dia">Día de reunión</label>
+        <select class="input" id="mm-dia"><option value="">Sin definir</option><option>Lunes</option><option>Martes</option><option>Miércoles</option><option>Jueves</option><option>Viernes</option><option>Sábado</option><option>Domingo</option></select></div>
+      <div class="campo"><label class="f-label" for="mm-hora">Hora</label><input type="time" class="input" id="mm-hora"></div>
+    </div>
+    <div id="mm-bloque-obs" class="campo"><label class="f-label" for="mm-obs">Observaciones iniciales (opcional)</label>
+      <textarea class="input" id="mm-obs" rows="3" placeholder="Queda como primer movimiento del historial"></textarea></div>
+    <p class="error-form" id="mm-error"></p>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+      <button class="btn btn-ghost" onclick="cerrarModal('modal-min')">Cancelar</button>
+      <button class="btn btn-primary" id="mm-guardar" onclick="guardarMinisterio()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: cargo de directiva / integrante -->
+<div class="modal-backdrop no-print" id="modal-miembro">
+  <div class="modal-box">
+    <h3 class="serif" id="mb-titulo">Agregar cargo</h3>
+    <div class="campo"><label class="f-label" for="mb-nombre">Nombre de la persona</label><input class="input" id="mb-nombre" autocomplete="off" placeholder="Nombre completo"></div>
+    <div class="campo"><label class="f-label" for="mb-rol" id="mb-rol-l">Cargo</label><input class="input" id="mb-rol" autocomplete="off"></div>
+    <div class="grid2">
+      <div class="campo"><label class="f-label" for="mb-desde" id="mb-desde-l">Inicio del período</label><input type="date" class="input" id="mb-desde"></div>
+      <div class="campo"><label class="f-label" for="mb-hasta" id="mb-hasta-l">Fin del período (opcional)</label><input type="date" class="input" id="mb-hasta"></div>
+    </div>
+    <p class="muted" id="mb-ayuda" style="font-size:.78rem;margin:-4px 0 8px;">Si pones fecha de fin, el sistema avisa antes de que termine el período.</p>
+    <p class="error-form" id="mb-error"></p>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+      <button class="btn btn-ghost" onclick="cerrarModal('modal-miembro')">Cancelar</button>
+      <button class="btn btn-primary" id="mb-guardar" onclick="guardarMiembro()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: activar / inactivar -->
+<div class="modal-backdrop no-print" id="modal-estado">
+  <div class="modal-box">
+    <h3 class="serif" id="me-titulo">Marcar como inactivo</h3>
+    <div class="campo"><label class="f-label" for="me-fecha">Fecha</label><input type="date" class="input" id="me-fecha"></div>
+    <div class="campo"><label class="f-label" for="me-texto">Motivo o nota</label><textarea class="input" id="me-texto" rows="3"></textarea></div>
+    <div class="campo"><label class="f-label" for="me-ref">Referencia (acta o sesión, opcional)</label><input class="input" id="me-ref"></div>
+    <p class="error-form" id="me-error"></p>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+      <button class="btn btn-ghost" onclick="cerrarModal('modal-estado')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarEstado()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ajustes -->
+<div class="modal-backdrop no-print" id="modal-ajustes">
+  <div class="modal-box">
+    <h3 class="serif">Ajustes</h3>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <div class="tab-mini active" data-tab="personas" onclick="tabAjustes('personas')">Personas</div>
+      <div class="tab-mini" data-tab="conexion" onclick="tabAjustes('conexion')">Conexión</div>
+    </div>
+    <div id="aj-personas">
+      <p class="muted" style="font-size:.8rem;margin:0 0 8px;">Lista de personas compartida con Disciplina y Minutas. Se agrega sola al registrar directivos e integrantes.</p>
+      <div id="aj-personas-lista" style="max-height:260px;overflow-y:auto;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;">
+        <input class="input" id="aj-persona-nueva" placeholder="Nombre de la persona">
+        <button class="btn btn-ghost btn-sm" style="flex-shrink:0;" onclick="agregarPersonaManual()" data-i="mas">Agregar</button>
+      </div>
+    </div>
+    <div id="aj-conexion" style="display:none;">
+      <p class="muted" style="font-size:.8rem;margin:0 0 6px;">Proyecto Firestore conectado:</p>
+      <p class="card" style="padding:8px 10px;margin:0;font-family:monospace;font-size:.85rem;background:var(--gray-100);" id="aj-proyecto"></p>
+      <button class="btn btn-danger btn-sm" style="margin-top:12px;" onclick="olvidarConfiguracion()">Olvidar configuración guardada y recargar</button>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-primary" onclick="cerrarModal('modal-ajustes')">Listo</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: informe PDF -->
+<div class="modal-backdrop no-print" id="modal-informe">
+  <div class="modal-box" style="max-width:740px;max-height:92vh;overflow-y:auto;">
+    <h3 class="serif">Informe en PDF</h3>
+    <div class="inf-sec" style="margin-top:0;">1. Qué organizaciones</div>
+    <div class="inf-cols" id="inf-tipos"></div>
+    <div class="grid2" style="margin-top:8px;">
+      <div class="campo"><label class="f-label" for="inf-estado">Estado</label><select class="input" id="inf-estado" onchange="infLista()"><option value="activos">Solo activos</option><option value="todos">Activos e inactivos</option><option value="inactivos">Solo inactivos</option></select></div>
+      <div class="campo"><label class="f-label">&nbsp;</label><label class="inf-chk"><input type="checkbox" id="inf-agrupar" checked> Separar por tipo (secciones)</label></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;flex-wrap:wrap;"><span class="muted" id="inf-cuenta" style="font-size:.8rem;"></span><span><button class="link" type="button" onclick="infMarcar(true)">Marcar todas</button> · <button class="link" type="button" onclick="infMarcar(false)">Ninguna</button></span></div>
+    <div id="inf-lista"></div>
+    <div class="inf-sec">2. Formato</div>
+    <div class="grid2">
+      <div class="campo"><label class="f-label" for="inf-formato">Tipo de informe</label><select class="input" id="inf-formato" onchange="infCampos()"><option value="fichas">Fichas: una por organización, con directiva e integrantes</option><option value="tabla">Resumen: una fila por organización</option><option value="personas">Lista de personas por organización</option></select></div>
+      <div class="campo"><label class="f-label" for="inf-orient">Orientación</label><select class="input" id="inf-orient"><option value="auto">Automática</option><option value="p">Vertical</option><option value="l">Horizontal</option></select></div>
+    </div>
+    <div class="inf-sec">3. Qué información</div>
+    <div class="inf-cols" id="inf-campos"></div>
+    <div class="inf-sec">4. Detalles del documento</div>
+    <div class="inf-cols">
+      <label class="inf-chk"><input type="checkbox" id="inf-resumen" checked> Resumen con totales al inicio</label>
+      <label class="inf-chk"><input type="checkbox" id="inf-conf" checked> Marcar como confidencial</label>
+      <label class="inf-chk"><input type="checkbox" id="inf-firmas"> Líneas de firma al final</label>
+    </div>
+    <p class="error-form" id="inf-error"></p>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap;">
+      <button class="btn btn-ghost" onclick="cerrarModal('modal-informe')">Cancelar</button>
+      <button class="btn btn-ghost" onclick="generarInforme('ver')">Vista previa</button>
+      <button class="btn btn-primary" id="inf-gen" onclick="generarInforme('guardar')">Descargar PDF</button>
+    </div>
+  </div>
+</div>
+
+<datalist id="dl-personas"></datalist>
+<datalist id="dl-roles"></datalist>
+<datalist id="dl-lugares"></datalist>
+<div id="toast-root"></div>
+
+<script>
+// ---------- Conexión (mismo proyecto y misma llave de configuración que Minutas) ----------
+const EMBEDDED_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAPeBr8Rw8Hw5OS0QFIBLdpgFeqaUuzzqs",
+  authDomain: "salem-minutas.firebaseapp.com",
+  projectId: "salem-minutas",
+  storageBucket: "salem-minutas.firebasestorage.app",
+  messagingSenderId: "509496830084",
+  appId: "1:509496830084:web:8865b4265d0065a3333ad1"
+};
+let db = null, auth = null, firebaseConfig = null, usuario = null;
+let unsubs = [], timerConexion = null, inactTimer = null;
+const LIMITE_INACTIVIDAD = 30*60*1000; // 30 minutos
+
+function cargarConfigGuardada(){
+  const raw = localStorage.getItem('minutas_firebase_config');
+  if(!raw) return null;
+  try{ return JSON.parse(raw); }catch(e){ return null; }
+}
+function inicializarFirebase(config){
+  firebase.initializeApp(config);
+  db = firebase.firestore();
+  auth = firebase.auth();
+  // Algunas redes, antivirus o bloqueadores cortan el streaming (WebChannel) de Firestore.
+  // Se fuerza long-polling, que es más lento pero compatible en esos casos.
+  try{ db.settings({ experimentalForceLongPolling:true, useFetchStreams:false, merge:true }); }catch(e){}
+  firebaseConfig = config;
+}
+function olvidarConfiguracion(){
+  if(!confirm('Esto borrará la configuración guardada en este navegador. ¿Continuar?')) return;
+  localStorage.removeItem('minutas_firebase_config');
+  location.reload();
+}
+
+// ---------- Utilidades de texto y fechas ----------
+const q = id => document.getElementById(id);
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function br(s){ return esc(s).replace(/\n/g,'<br>'); }
+function norm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim(); }
+function uid(){ return 'h' + Math.random().toString(36).slice(2,9) + Date.now().toString(36); }
+function pl(n, uno, otros){ return n + ' ' + (n===1 ? uno : otros); }
+
+// Fechas siempre en hora local (evita el desfase de UTC en las tardes de Guatemala)
+function fISO(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function hoyISO(){ return fISO(new Date()); }
+function parseISO(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+function sumarDias(iso, n){ const d = parseISO(iso); d.setDate(d.getDate()+n); return fISO(d); }
+function sumarMeses(iso, n){
+  const d = parseISO(iso), dia = d.getDate();
+  d.setDate(1); d.setMonth(d.getMonth()+n);
+  const ult = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  d.setDate(Math.min(dia, ult));
+  return fISO(d);
+}
+function diffDias(a, b){ return Math.round((parseISO(b) - parseISO(a)) / 86400000); } // b - a
+function mesesTranscurridos(desde, hasta){
+  const a = parseISO(desde), b = parseISO(hasta);
+  let m = (b.getFullYear()-a.getFullYear())*12 + (b.getMonth()-a.getMonth());
+  if(b.getDate() < a.getDate()) m--;
+  return Math.max(0, m);
+}
+function fmtFecha(iso){ if(!iso) return '—'; const d = parseISO(iso); return d.getDate() + ' ' + MESES[d.getMonth()] + ' ' + d.getFullYear(); }
+function calcFin(inicio, n, unidad){
+  if(unidad==='dias') return sumarDias(inicio, n);
+  if(unidad==='semanas') return sumarDias(inicio, n*7);
+  if(unidad==='anios') return sumarMeses(inicio, n*12);
+  return sumarMeses(inicio, n);
+}
+const UNIDADES = { dias:['día','días'], semanas:['semana','semanas'], meses:['mes','meses'], anios:['año','años'] };
+
+function toast(msg, error){
+  const t = document.createElement('div');
+  t.className = 'toast' + (error ? ' err' : ''); t.textContent = msg;
+  q('toast-root').appendChild(t); setTimeout(() => t.remove(), 2600);
+}
+function abrirModal(id){ q(id).style.display = 'flex'; }
+function cerrarModal(id){ q(id).style.display = 'none'; }
+
+
+// ---------- Sugerencias al escribir (reemplaza la lista larga del navegador) ----------
+// Aparece solo cuando se escriben al menos `minimo` letras, filtra por lo escrito y muestra máximo 6 coincidencias.
+function plano(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function activarSugerencias(id, obtener, minimo){
+  const inp = document.getElementById(id); if(!inp) return;
+  inp.removeAttribute('list'); inp.setAttribute('autocomplete','off'); inp.setAttribute('spellcheck','false');
+  const box = document.createElement('div'); box.className = 'sug-box'; box.setAttribute('role','listbox'); document.body.appendChild(box);
+  let items = [], sel = -1, omitir = false;
+  const cerrar = () => { box.style.display = 'none'; sel = -1; };
+  const marcar = () => { [...box.children].forEach((el,i) => el.classList.toggle('activo', i===sel)); if(sel>=0) box.children[sel].scrollIntoView({ block:'nearest' }); };
+  const elegir = v => { omitir = true; inp.value = v; cerrar(); inp.dispatchEvent(new Event('input', { bubbles:true })); inp.dispatchEvent(new Event('change', { bubbles:true })); omitir = false; };
+  const mostrar = () => {
+    if(omitir) return;
+    const t = plano(inp.value).trim();
+    if(t.length < (minimo||2)){ cerrar(); return; }
+    const vistos = new Set();
+    items = obtener().filter(v => { if(!v) return false; const p = plano(v).trim(); if(vistos.has(p) || p===t || !(p.startsWith(t) || (' ' + p).includes(' ' + t))) return false; vistos.add(p); return true; })
+      .sort((a,b) => (plano(b).startsWith(t) - plano(a).startsWith(t)) || a.localeCompare(b,'es')).slice(0,6);
+    if(!items.length){ cerrar(); return; }
+    box.innerHTML = items.map((v,i) => {
+      const p = plano(v), k = p.startsWith(t) ? 0 : p.indexOf(' ' + t) + 1;
+      const html = k<=0 && !p.startsWith(t) ? esc(v) : esc(v.slice(0,k)) + '<mark>' + esc(v.slice(k,k+t.length)) + '</mark>' + esc(v.slice(k+t.length));
+      return '<div class="sug-item" role="option" data-i="' + i + '">' + html + '</div>';
+    }).join('');
+    const r = inp.getBoundingClientRect();
+    box.style.left = r.left + 'px'; box.style.top = (r.bottom+2) + 'px'; box.style.width = r.width + 'px'; box.style.display = 'block'; sel = -1;
+  };
+  inp.addEventListener('input', mostrar);
+  inp.addEventListener('keydown', e => {
+    if(box.style.display !== 'block') return;
+    if(e.key==='ArrowDown'){ e.preventDefault(); sel = (sel+1) % items.length; marcar(); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); sel = (sel-1+items.length) % items.length; marcar(); }
+    else if(e.key==='Enter' && sel>=0){ e.preventDefault(); elegir(items[sel]); }
+    else if(e.key==='Escape'){ e.stopPropagation(); cerrar(); }
+  });
+  inp.addEventListener('blur', () => setTimeout(cerrar, 150));
+  box.addEventListener('mousedown', e => { e.preventDefault(); const el = e.target.closest('.sug-item'); if(el) elegir(items[+el.dataset.i]); });
+  document.addEventListener('scroll', cerrar, true); window.addEventListener('resize', cerrar);
+}
+
+// ---------- Estado ----------
+let ministerios = [], personas = [], disc = [];
+let abiertoId = null, entradaEditando = null, filtroEstado = 'todos', filtroTipo = 'todos', busqueda = '';
+let modoMin = 'nuevo', minEditId = null, miembroKind = 'directiva', miembroEditId = null, estadoAccion = 'inactivar';
+let cargado = false, hashAplicado = false;
+const DIAS_AVISO = 30; // días de anticipación para avisar que termina el período de un cargo
+const TIPOS_MIN = { ministerio:{label:'Ministerio',ico:'cruz'}, sociedad:{label:'Sociedad',ico:'personas'}, grupo:{label:'Grupo familiar',ico:'casa'}, comite:{label:'Comité',ico:'comite'}, otro:{label:'Otro',ico:'rombo'} };
+const TIPOS_H = { creacion:'Registro inicial', actualizacion:'Actualización', directiva:'Cambio de directiva', informe:'Informe', decision:'Decisión del Consejo', estado:'Cambio de estado' };
+const TIPOS_SEL = ['actualizacion','directiva','informe','decision'];
+const CARGOS_BASE = ['Presidente','Vicepresidente','Secretario','Tesorero','Vocal','Líder','Coordinador','Director','Maestro'];
+
+function autorActual(){ return usuario && usuario.email ? usuario.email : ''; }
+function nombreAutor(e){ return String(e||'').split('@')[0]; }
+function detenerApp(){
+  unsubs.forEach(u => { try{ u(); }catch(e){} }); unsubs = []; clearTimeout(timerConexion);
+  ministerios = []; personas = []; disc = []; cargado = false; abiertoId = null; entradaEditando = null;
+  q('lista').innerHTML = '<div class="skel-lista"><div class="skel-card"></div><div class="skel-card"></div><div class="skel-card"></div></div>';
+}
+function fmtHora(t){ if(!t) return ''; const [h,m] = t.split(':').map(Number); return (h%12||12) + ':' + String(m).padStart(2,'0') + ' ' + (h>=12 ? 'p. m.' : 'a. m.'); }
+function reunionTexto(m){
+  let s = m.reunionDia || '';
+  if(m.reunionHora) s += (s ? ' a las ' : 'A las ') + fmtHora(m.reunionHora);
+  if(m.reunionLugar) s += (s ? ', en ' : 'En ') + m.reunionLugar;
+  return s || 'Sin definir';
+}
+
+// ---------- Directiva e integrantes ----------
+function estadoMiembro(m){ const h = hoyISO(); if(m.hasta && m.hasta < h) return 'fin'; if(m.desde && m.desde > h) return 'futuro'; return 'vigente'; }
+function vigente(m){ return estadoMiembro(m) === 'vigente'; }
+function ordenarMiembros(arr){
+  const o = { vigente:0, futuro:1, fin:2 };
+  return [...arr].sort((a,b) => o[estadoMiembro(a)]-o[estadoMiembro(b)] || a.nombre.localeCompare(b.nombre,'es'));
+}
+function suspensionesDe(personaId, nombre){
+  return disc.filter(c => c.estado==='suspendido' && ((personaId && c.personaId===personaId) || norm(c.nombre)===norm(nombre)));
+}
+function suspendidosDelMinisterio(mi){
+  return disc.filter(c => c.estado==='suspendido' && (c.ministerioId===mi.id || norm(c.ministerio)===norm(mi.nombre)));
+}
+
+// ---------- Alertas ----------
+// Un ministerio activo avisa si: no tiene a nadie con cargo vigente; el período de un cargo ya venció sin reemplazo;
+// o el período de un cargo termina en DIAS_AVISO días o menos y no hay reemplazo previsto.
+function alertasDe(mi){
+  if(mi.estado !== 'activo') return [];
+  const hoy = hoyISO(), dir = mi.directiva || [], out = [];
+  if(!dir.some(vigente)) out.push({ nivel:'vencida', orden:0, dias:-99999, chip:'Sin directiva vigente', texto:'No hay nadie con un cargo vigente en la directiva.' });
+  const grupos = {};
+  dir.forEach(m => { const k = norm(m.rol); (grupos[k] = grupos[k] || []).push(m); });
+  Object.values(grupos).forEach(g => {
+    const vig = g.filter(vigente), futuro = g.some(o => o.desde && o.desde > hoy);
+    if(!vig.length){
+      if(futuro) return;
+      const ult = [...g].sort((a,b) => (b.hasta||'').localeCompare(a.hasta||''))[0];
+      if(ult.hasta && ult.hasta < hoy){
+        const d = diffDias(hoy, ult.hasta);
+        out.push({ nivel:'vencida', orden:1, dias:d, chip:'Período vencido: ' + ult.rol, texto:'El período de ' + ult.nombre + ' como ' + ult.rol + ' terminó hace ' + pl(-d,'día','días') + ' y no hay reemplazo.' });
+      }
+    }else{
+      vig.forEach(v => {
+        if(!v.hasta) return;
+        const d = diffDias(hoy, v.hasta);
+        if(d <= DIAS_AVISO && !futuro && !vig.some(o => o.id!==v.id && (!o.hasta || o.hasta > v.hasta)))
+          out.push({ nivel:'proxima', orden:2, dias:d, chip:v.rol + ': ' + (d===0 ? 'termina hoy' : pl(d,'día','días')),
+            texto:'El período de ' + v.nombre + ' como ' + v.rol + (d===0 ? ' termina hoy.' : ' termina en ' + pl(d,'día','días') + ' (' + fmtFecha(v.hasta) + ').') });
+      });
+    }
+  });
+  return out.sort((a,b) => a.orden-b.orden || a.dias-b.dias);
+}
+function alertaDe(mi){ return alertasDe(mi)[0] || null; }
+
+// ---------- Arranque ----------
+function iniciarApp(){
+  detenerApp();
+  const hoy = new Date();
+  unsubs.push(db.collection('ministerios').onSnapshot(snap => {
+    ministerios = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    cargado = true; q('banner-error').style.display = 'none';
+    refrescarListas(); render(); aplicarHash();
+  }, errorFirestore));
+  timerConexion = setTimeout(() => {
+    if(cargado) return;
+    const b = q('banner-error');
+    b.innerHTML = '<b>No se logra conectar con Firestore.</b> Revisa tu conexión a internet, que ningún bloqueador bloquee <b>firestore.googleapis.com</b> y que las reglas de Firestore incluyan la colección <b>ministerios</b>.';
+    b.style.display = 'block';
+  }, 10000);
+  unsubs.push(db.collection('personas').onSnapshot(snap => {
+    personas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    refrescarListas();
+    if(q('modal-ajustes').style.display==='flex') renderPersonas();
+  }, errorFirestore));
+  // Solo lectura: para señalar a quienes están en suspensión
+  unsubs.push(db.collection('disciplina').onSnapshot(snap => {
+    disc = snap.docs.map(d => ({ id:d.id, ...d.data() })); render();
+  }, e => console.warn('Disciplina no disponible (se omite el cruce de suspensiones):', e)));
+}
+function refrescarListas(){
+  const opt = arr => arr.map(v => '<option value="' + esc(v) + '"></option>').join('');
+  const uniq = arr => [...new Set(arr.filter(Boolean))].sort((a,b) => a.localeCompare(b,'es'));
+  q('dl-personas').innerHTML = opt(uniq(personas.map(p => p.nombre)));
+  const roles = [].concat(CARGOS_BASE, ['Integrante'], ...ministerios.map(m => (m.directiva||[]).concat(m.integrantes||[]).map(x => x.rol)));
+  q('dl-roles').innerHTML = opt(uniq(roles));
+  q('dl-lugares').innerHTML = opt(uniq(ministerios.map(m => m.reunionLugar)));
+}
+function render(){
+  const n = ministerios.filter(m => alertasDe(m).length).length;
+  document.title = (n ? '(' + n + ') ' : '') + 'Ministerios y grupos del Consejo Local';
+  if(abiertoId && !ministerios.find(m => m.id===abiertoId)) abiertoId = null;
+  if(abiertoId){ q('vista-lista').style.display = 'none'; q('vista-detalle').style.display = 'block'; renderDetalle(); }
+  else{ q('vista-detalle').style.display = 'none'; q('vista-lista').style.display = 'block'; renderLista(); }
+}
+
+// ---------- Lista ----------
+function prio(m){ if(m.estado!=='activo') return 5; const a = alertaDe(m); return a ? a.orden : 3; }
+function listaFiltrada(){
+  const t = norm(busqueda);
+  return ministerios.filter(m => {
+    if(filtroEstado==='activos' && m.estado!=='activo') return false;
+    if(filtroEstado==='inactivos' && m.estado==='activo') return false;
+    if(filtroEstado==='atencion' && !alertasDe(m).length) return false;
+    if(filtroTipo!=='todos' && (TIPOS_MIN[m.tipo] ? m.tipo : 'otro')!==filtroTipo) return false;
+    if(t){
+      const pajar = norm([m.nombre, m.proposito, m.reunionLugar, (TIPOS_MIN[m.tipo]||{}).label].join(' ') + ' ' +
+        (m.directiva||[]).concat(m.integrantes||[]).map(x => x.nombre + ' ' + x.rol).join(' ') + ' ' + (m.historial||[]).map(h => h.texto).join(' '));
+      if(!pajar.includes(t)) return false;
+    }
+    return true;
+  }).sort((a,b) => prio(a)-prio(b) || a.nombre.localeCompare(b.nombre,'es',{numeric:true}));
+}
+// Enlace directo desde el panel principal: MinisteriosConsejoLocal.html#abrir=ID
+function aplicarHash(){
+  if(hashAplicado || !cargado) return; hashAplicado = true;
+  const h = location.hash.match(/abrir=([\w-]+)/);
+  if(h && ministerios.find(x => x.id===h[1])) abrirMin(h[1]);
+}
+function setFiltro(f){ filtroEstado = (filtroEstado===f && f!=='todos') ? 'todos' : f; renderLista(); }
+function liderTexto(mi){
+  const vig = (mi.directiva||[]).filter(vigente);
+  if(!vig.length) return 'Sin directiva vigente';
+  const p = vig.find(d => /president|l[ií]der|director|coordinador/i.test(d.rol)) || vig[0];
+  return esc(p.rol) + ': ' + esc(p.nombre) + (vig.length>1 ? ' (+' + (vig.length-1) + ' más)' : '');
+}
+function renderLista(){
+  renderTabsTipo();
+  const act = ministerios.filter(m => m.estado==='activo').length, ina = ministerios.length - act;
+  const als = []; ministerios.forEach(m => alertasDe(m).forEach(a => als.push({ m, a })));
+  als.sort((x,y) => x.a.orden-y.a.orden || x.a.dias-y.a.dias);
+  const nAten = new Set(als.map(x => x.m.id)).size;
+  const st = (f, n, l, cls) => '<button class="stat ' + cls + (filtroEstado===f?' active':'') + '" onclick="setFiltro(\'' + f + '\')"><div class="n">' + n + '</div><div class="l">' + l + '</div></button>';
+  q('resumen').innerHTML = st('activos', act, 'Activos', 'stat-act') + st('atencion', nAten, 'Requieren atención', 'stat-aten') + st('inactivos', ina, 'Inactivos', 'stat-ina') + st('todos', ministerios.length, 'Todos', '');
+  const ico = { vencida:ic('alerta'), proxima:ic('reloj') };
+  q('alertas').innerHTML = als.map(({m,a}) => '<div class="alerta alerta-' + a.nivel + ' no-print"><span class="ico">' + ico[a.nivel] + '</span><div class="txt"><b>' + esc(m.nombre) + '</b>' + esc(a.texto) + '</div><button class="btn btn-sm" onclick="abrirMin(\'' + m.id + '\')">Abrir</button></div>').join('');
+  if(!cargado) return;
+  const lista = listaFiltrada();
+  if(!lista.length){
+    q('lista').innerHTML = '<div class="card" style="padding:34px;text-align:center;"><h2 class="serif" style="margin:0 0 6px;color:var(--navy);">' + (ministerios.length ? 'Nada coincide' : 'Aún no hay ministerios ni grupos') + '</h2><p class="muted" style="margin:0 0 14px;font-size:.9rem;">' + (ministerios.length ? 'Cambia el filtro o la búsqueda.' : 'Registra el primero para empezar a llevar su directiva e integrantes.') + '</p>' + (ministerios.length ? '' : '<button class="btn btn-gold" onclick="abrirModalMin()">' + ic('mas') + 'Nuevo ministerio o grupo</button>') + '</div>';
+    return;
+  }
+  const card = m => {
+    const a = alertaDe(m), T = TIPOS_MIN[m.tipo] || TIPOS_MIN.otro, activo = m.estado==='activo';
+    const nInt = (m.integrantes||[]).filter(vigente).length;
+    const susp = new Set([].concat((m.directiva||[]).filter(vigente), (m.integrantes||[]).filter(vigente)).filter(x => suspensionesDe(x.personaId, x.nombre).length).map(x => x.nombre)).size;
+    return '<div class="caso ' + (activo?'caso-act':'caso-ina') + '" role="button" tabindex="0" onclick="abrirMin(\'' + m.id + '\')" onkeydown="if(event.key===\'Enter\')abrirMin(\'' + m.id + '\')">' +
+      '<div class="medal" title="' + esc(T.label) + '">' + ic(T.ico) + '</div>' +
+      '<div class="caso-main"><div class="caso-top"><span class="caso-nombre serif">' + esc(m.nombre) + '</span>' +
+      '<span class="badge ' + (activo?'badge-act':'badge-ina') + '">' + (activo?'Activo':'Inactivo') + '</span>' +
+      (a ? '<span class="chip-alerta chip-' + a.nivel + '">' + esc(a.chip) + '</span>' : '') +
+      (susp ? '<span class="badge badge-susp">' + ic('prohibido') + pl(susp,'persona','personas') + ' en suspensión</span>' : '') + '</div>' +
+      '<div class="caso-linea">' + liderTexto(m) + '</div>' +
+      '<div class="caso-linea"><b>Reunión:</b> ' + esc(reunionTexto(m)) + '</div>' +
+      '<div class="caso-linea">' + pl(nInt,'integrante','integrantes') + '</div></div></div>';
+  };
+  if(filtroTipo !== 'todos'){ q('lista').innerHTML = lista.map(card).join(''); return; }
+  q('lista').innerHTML = ORDEN_TIPOS.map(t => { const it = lista.filter(m => tipoDe(m) === t); return it.length ? seccionTipo(t, it, card) : ''; }).join('');
+}
+// ---------- Organización por tipo ----------
+const ORDEN_TIPOS = ['ministerio', 'grupo', 'sociedad', 'comite', 'otro'];
+const TIPOS_PLURAL = { ministerio:'Ministerios', grupo:'Grupos familiares', sociedad:'Sociedades', comite:'Comités', otro:'Otras organizaciones' };
+let seccionesCerradas = new Set();
+function tipoDe(m){ return TIPOS_MIN[m.tipo] ? m.tipo : 'otro'; }
+function renderTabsTipo(){
+  const n = t => ministerios.filter(m => tipoDe(m) === t).length;
+  const tabs = [['todos', 'Todos', ministerios.length]].concat(ORDEN_TIPOS.filter(t => n(t) > 0 || t === 'ministerio' || t === 'grupo' || filtroTipo === t).map(t => [t, TIPOS_PLURAL[t], n(t)]));
+  q('tabs-tipo').innerHTML = tabs.map(x => '<button class="tabt' + (filtroTipo === x[0] ? ' on' : '') + '" onclick="setTipo(\'' + x[0] + '\')">' + x[1] + '<span class="tn">' + x[2] + '</span></button>').join('');
+}
+function setTipo(t){ filtroTipo = t; renderLista(); }
+function toggleSec(t){
+  if(seccionesCerradas.has(t)) seccionesCerradas.delete(t); else seccionesCerradas.add(t);
+  const h = q('sec-h-' + t), b = q('sec-b-' + t); if(!h || !b) return;
+  const cerrada = seccionesCerradas.has(t); b.classList.toggle('cerrado', cerrada); h.classList.toggle('abierto', !cerrada); h.setAttribute('aria-expanded', cerrada ? 'false' : 'true');
+}
+function seccionTipo(t, items, card){
+  const cerrada = seccionesCerradas.has(t), T = TIPOS_MIN[t] || TIPOS_MIN.otro, act = items.filter(m => m.estado === 'activo').length;
+  return '<section class="sec-tipo"><button class="sec-h' + (cerrada ? '' : ' abierto') + '" id="sec-h-' + t + '" aria-expanded="' + (cerrada ? 'false' : 'true') + '" onclick="toggleSec(\'' + t + '\')"><span class="sec-ico">' + ic(T.ico) + '</span><span class="sec-t serif">' + TIPOS_PLURAL[t] + '</span><span class="sec-n">' + items.length + (act !== items.length ? ' · ' + act + ' activos' : '') + '</span><span class="chev"></span></button>' +
+    '<div class="acc-cuerpo' + (cerrada ? ' cerrado' : '') + '" id="sec-b-' + t + '"><div class="in">' + items.map(card).join('') + '</div></div></section>';
+}
+function abrirMin(id){ abiertoId = id; entradaEditando = null; histAbierto = false; entAbiertas = new Set(); nuevoAbierto = false; antAbierto = { directiva:false, integrantes:false }; window.scrollTo(0,0); q('vista-lista').style.display = 'none'; q('vista-detalle').style.display = 'block'; renderDetalle(true, true); }
+function volverLista(){ abiertoId = null; entradaEditando = null; render(); }
+
+// ---------- Detalle ----------
+function capturarForm(cont){
+  const o = { vals:{}, foco:null, sel:null };
+  cont.querySelectorAll('[id^="f-"]').forEach(el => { o.vals[el.id] = el.value; });
+  const a = document.activeElement;
+  if(a && a.id && cont.contains(a)){ o.foco = a.id; try{ o.sel = [a.selectionStart, a.selectionEnd]; }catch(e){} }
+  return o;
+}
+function restaurarForm(o){
+  Object.entries(o.vals).forEach(([id,v]) => { const el = q(id); if(el) el.value = v; });
+  if(o.foco){ const el = q(o.foco); if(el){ el.focus(); try{ if(o.sel) el.setSelectionRange(o.sel[0], o.sel[1]); }catch(e){} } }
+}
+function renderDetalle(soltarEdicion, soltarTodo){
+  const mi = minActual(); if(!mi) return;
+  const cont = q('vista-detalle');
+  const guardado = soltarTodo ? { vals:{}, foco:null } : capturarForm(cont);
+  if(soltarEdicion) Object.keys(guardado.vals).forEach(k => { if(k.startsWith('f-e-')) delete guardado.vals[k]; });
+  cont.innerHTML = htmlDetalle(mi);
+  restaurarForm(guardado);
+}
+function minActual(){ return ministerios.find(m => m.id===abiertoId); }
+function dato(k, v){ return '<div><div class="k">' + k + '</div><div class="v">' + v + '</div></div>'; }
+function htmlFila(kind, m){
+  const e = estadoMiembro(m), susp = suspensionesDe(m.personaId, m.nombre);
+  const lblFin = kind==='directiva' ? 'Período terminado' : 'Ya no participa';
+  const periodo = (m.desde ? 'Desde ' + fmtFecha(m.desde) : '') + (m.hasta ? (m.desde ? ' hasta ' : 'Hasta ') + fmtFecha(m.hasta) : '');
+  return '<div class="fila-m ' + (e==='fin'?'fila-fin':'') + '"><div class="fm-main"><span class="fm-nombre">' + esc(m.nombre) + '</span><span class="nota-tag">' + esc(m.rol) + '</span> ' +
+    (e==='fin' ? '<span class="badge badge-ina">' + lblFin + '</span>' : e==='futuro' ? '<span class="badge tp-directiva">Por iniciar</span>' : '') +
+    (susp.length ? ' <span class="badge badge-susp" title="' + esc(susp.map(c => c.ministerio).join(', ')) + '">' + ic('prohibido') + 'En suspensión</span>' : '') +
+    (periodo ? '<div class="fm-sub">' + periodo + '</div>' : '') + '</div>' +
+    '<div class="fm-acc no-print"><button class="link" onclick="abrirMiembro(\'' + kind + '\',\'' + m.id + '\')">Editar</button><button class="link del" onclick="quitarMiembro(\'' + kind + '\',\'' + m.id + '\')">Quitar</button></div></div>';
+}
+function htmlDetalle(mi){
+  const act = mi.estado==='activo', als = alertasDe(mi), T = TIPOS_MIN[mi.tipo] || TIPOS_MIN.otro;
+  const dir = ordenarMiembros(mi.directiva||[]), integ = ordenarMiembros(mi.integrantes||[]);
+  const nAct = (mi.integrantes||[]).filter(vigente).length, vinc = suspendidosDelMinisterio(mi);
+  const hist = [...(mi.historial||[])].sort((x,y) => (x.fecha||'').localeCompare(y.fecha||'') || (x.creado||0)-(y.creado||0));
+  const ico = { vencida:ic('alerta'), proxima:ic('reloj') };
+  return '<div class="print-only" style="margin-bottom:14px;"><div class="serif" style="font-size:1.1rem;font-weight:700;">Iglesia Evangélica Centroamericana "Salem" · Consejo Local</div><div style="font-size:.85rem;">Ficha de ministerio o grupo, impreso el ' + fmtFecha(hoyISO()) + '</div></div>' +
+  '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">' +
+    '<button class="btn btn-ghost" onclick="volverLista()">' + ic('volver') + 'Volver a la lista</button><span style="flex:1"></span>' +
+    '<button class="btn btn-ghost" onclick="abrirModalMin(\'' + mi.id + '\')">' + ic('editar') + 'Editar datos</button>' +
+    '<button class="btn btn-ghost" onclick="window.print()">' + ic('imprimir') + 'Imprimir ficha</button>' +
+    '<button class="btn btn-ghost" onclick="abrirEstado()">' + (act ? ic('pausa') + 'Marcar inactivo' : ic('play') + 'Reactivar') + '</button>' +
+    '<button class="btn btn-danger" onclick="eliminarMin()">' + ic('eliminar') + 'Eliminar</button></div>' +
+  '<div class="card" style="overflow:hidden;"><div class="banda ' + (act?'banda-act':'banda-ina') + '">' + (act ? 'ACTIVO' : 'INACTIVO' + (mi.fechaEstado ? ' desde el ' + fmtFecha(mi.fechaEstado) : '')) + '</div><div style="padding:20px;">' +
+    '<h2 class="serif" style="margin:0 0 16px;font-size:1.6rem;color:var(--navy);">' + esc(mi.nombre) + '</h2>' +
+    als.map(a => '<div class="alerta alerta-' + a.nivel + '" style="margin-bottom:10px;"><span class="ico">' + ico[a.nivel] + '</span><div class="txt">' + esc(a.texto) + '</div></div>').join('') +
+    '<div class="datos" style="margin-top:6px;">' + dato('Tipo', esc(T.label)) + dato('Fundación', mi.fechaFundacion ? fmtFecha(mi.fechaFundacion) : 'Sin registrar') + dato('Reunión', esc(reunionTexto(mi))) + '</div>' +
+    (mi.proposito ? '<div style="margin-top:16px;"><div class="datos"><div style="grid-column:1/-1;"><div class="k">Propósito</div><div class="tl-texto" style="margin-top:3px;">' + br(mi.proposito) + '</div></div></div></div>' : '') +
+  '</div></div>' +
+  '<div class="seccion-h"><h3 class="serif">Directiva</h3><button class="btn btn-gold btn-sm no-print" onclick="abrirMiembro(\'directiva\')">' + ic('mas') + 'Agregar cargo</button></div>' +
+  htmlListaMiembros('directiva', dir, 'Aún no hay cargos registrados.') +
+  '<div class="seccion-h"><h3 class="serif">Integrantes <span class="muted" style="font-size:.85rem;font-family:Inter,sans-serif;font-weight:500;">' + pl(nAct,'activo','activos') + '</span></h3><button class="btn btn-gold btn-sm no-print" onclick="abrirMiembro(\'integrantes\')">' + ic('mas') + 'Agregar integrante</button></div>' +
+  htmlListaMiembros('integrantes', integ, 'Aún no hay integrantes registrados.') +
+  (vinc.length ? '<div class="seccion-h"><h3 class="serif">Suspensiones vinculadas</h3></div>' + vinc.map(c => '<div class="fila-m"><div class="fm-main"><span class="fm-nombre">' + esc(c.nombre) + '</span><span class="badge badge-susp">En suspensión</span><div class="fm-sub">Privilegio: ' + esc(c.ministerio) + ', desde ' + fmtFecha(c.fechaInicio) + '</div></div></div>').join('') : '') +
+  htmlHistorial(hist) +
+  '<div class="print-only" style="margin-top:24px;font-size:.78rem;border-top:1px solid #999;padding-top:8px;">Uso interno del Consejo Local</div>';
+}
+function opcionesTipo(lista, sel){ return lista.map(t => '<option value="' + t + '"' + (t===sel?' selected':'') + '>' + TIPOS_H[t] + '</option>').join(''); }
+function htmlEntrada(h){
+  const t = TIPOS_H[h.tipo] ? h.tipo : 'actualizacion';
+  if(entradaEditando === h.id){
+    const fijo = ['creacion','estado'].includes(t);
+    return '<div class="tl-item"><span class="tl-dot tp-' + t + '"></span><div class="nuevo-mov">' +
+      '<div class="grid3"><div class="campo"><label class="f-label" for="f-e-fecha">Fecha</label><input type="date" class="input" id="f-e-fecha" value="' + esc(h.fecha) + '"></div>' +
+      '<div class="campo"><label class="f-label" for="f-e-tipo">Tipo</label>' + (fijo ? '<input class="input" id="f-e-tipo" value="' + esc(TIPOS_H[t]) + '" disabled>' : '<select class="input" id="f-e-tipo">' + opcionesTipo(TIPOS_SEL, t) + '</select>') + '</div>' +
+      '<div class="campo"><label class="f-label" for="f-e-ref">Referencia</label><input class="input" id="f-e-ref" value="' + esc(h.referencia||'') + '"></div></div>' +
+      '<div class="campo"><label class="f-label" for="f-e-texto">Texto</label><textarea class="input" id="f-e-texto" rows="5">' + esc(h.texto) + '</textarea></div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;"><button class="btn btn-ghost btn-sm" onclick="entradaEditando=null;renderDetalle(true)">Cancelar</button><button class="btn btn-primary btn-sm" onclick="guardarEntrada(\'' + h.id + '\')">Guardar cambios</button></div></div></div>';
+  }
+  return '<div class="tl-item"><span class="tl-dot tp-' + t + '"></span><div class="tl-card"><div class="tl-head">' +
+    '<span class="tl-fecha">' + fmtFecha(h.fecha) + '</span><span class="badge tp-' + t + '">' + TIPOS_H[t] + '</span>' +
+    (h.referencia ? '<span class="nota-tag">' + ic('clip') + esc(h.referencia) + '</span>' : '') +
+    (h.autor ? '<span class="tl-ed">registró ' + esc(nombreAutor(h.autor)) + '</span>' : '') +
+    (h.editado ? '<span class="tl-ed">editado el ' + fmtFecha(fISO(new Date(h.editado))) + (h.editadoPor ? ' por ' + esc(nombreAutor(h.editadoPor)) : '') + '</span>' : '') +
+    '<span class="tl-acc no-print"><button class="link" onclick="editarEntrada(\'' + h.id + '\')">Editar</button>' +
+    (t==='creacion' ? '' : '<button class="link del" onclick="eliminarEntrada(\'' + h.id + '\')">Eliminar</button>') + '</span></div>' +
+    '<div class="tl-texto">' + br(h.texto) + '</div></div></div>';
+}
+// ---------- Detalle: listas anteriores e historial desplegables ----------
+let histAbierto = false, entAbiertas = new Set(), nuevoAbierto = false, antAbierto = { directiva:false, integrantes:false };
+function toggleCuerpo(idBtn, idCuerpo, abierto){
+  const b = q(idBtn), c = q(idCuerpo); if(!b || !c) return;
+  c.classList.toggle('cerrado', !abierto); b.classList.toggle('abierto', abierto); b.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+}
+function toggleHist(){ histAbierto = !histAbierto; toggleCuerpo('hist-btn', 'hist-cuerpo', histAbierto); }
+function toggleAnt(k){ antAbierto[k] = !antAbierto[k]; toggleCuerpo('ant-b-' + k, 'ant-c-' + k, antAbierto[k]); }
+function toggleEnt(id){ if(entAbiertas.has(id)) entAbiertas.delete(id); else entAbiertas.add(id); toggleCuerpo('te-h-' + id, 'te-c-' + id, entAbiertas.has(id)); }
+function toggleNuevo(){ nuevoAbierto = !nuevoAbierto; toggleCuerpo('nuevo-btn', 'nuevo-cuerpo', nuevoAbierto); }
+function htmlListaMiembros(kind, lista, vacio){
+  const vig = lista.filter(m => estadoMiembro(m) !== 'fin'), fin = lista.filter(m => estadoMiembro(m) === 'fin'), et = kind === 'directiva' ? 'Cargos anteriores' : 'Integrantes anteriores';
+  return (vig.length ? vig.map(m => htmlFila(kind, m)).join('') : '<p class="muted" style="font-size:.88rem;">' + (fin.length ? 'No hay ' + (kind === 'directiva' ? 'cargos vigentes.' : 'integrantes activos.') : vacio) + '</p>') +
+    (fin.length ? '<button class="acc-b mini' + (antAbierto[kind] ? ' abierto' : '') + '" id="ant-b-' + kind + '" aria-expanded="' + (antAbierto[kind] ? 'true' : 'false') + '" onclick="toggleAnt(\'' + kind + '\')"><span class="acc-t">' + et + '</span><span class="sec-n">' + fin.length + '</span><span style="flex:1"></span><span class="chev"></span></button>' +
+      '<div class="acc-cuerpo' + (antAbierto[kind] ? '' : ' cerrado') + '" id="ant-c-' + kind + '"><div class="in">' + fin.map(m => htmlFila(kind, m)).join('') + '</div></div>' : '');
+}
+function htmlEntradaComp(h){
+  if(entradaEditando === h.id) return htmlEntrada(h);
+  const t = TIPOS_H[h.tipo] ? h.tipo : 'actualizacion', ab = entAbiertas.has(h.id), linea = String(h.texto || '').split('\n')[0];
+  return '<div class="te"><button class="te-h' + (ab ? ' abierto' : '') + '" id="te-h-' + h.id + '" aria-expanded="' + (ab ? 'true' : 'false') + '" onclick="toggleEnt(\'' + h.id + '\')"><span class="tl-dot tp-' + t + '" style="position:static;flex-shrink:0;"></span><span class="te-f">' + fmtFecha(h.fecha) + '</span><span class="badge tp-' + t + '">' + TIPOS_H[t] + '</span><span class="te-r">' + esc(linea) + '</span><span class="chev"></span></button>' +
+    '<div class="acc-cuerpo' + (ab ? '' : ' cerrado') + '" id="te-c-' + h.id + '"><div class="in"><div class="te-b"><div class="te-m">' +
+    (h.referencia ? '<span class="nota-tag">' + ic('clip') + esc(h.referencia) + '</span>' : '') + (h.autor ? '<span class="tl-ed">registró ' + esc(nombreAutor(h.autor)) + '</span>' : '') +
+    (h.editado ? '<span class="tl-ed">editado el ' + fmtFecha(fISO(new Date(h.editado))) + (h.editadoPor ? ' por ' + esc(nombreAutor(h.editadoPor)) : '') + '</span>' : '') +
+    '<span class="tl-acc no-print" style="margin-left:auto;"><button class="link" onclick="editarEntrada(\'' + h.id + '\')">Editar</button>' + (t === 'creacion' ? '' : '<button class="link del" onclick="eliminarEntrada(\'' + h.id + '\')">Eliminar</button>') + '</span></div>' +
+    '<div class="tl-texto">' + br(h.texto) + '</div></div></div></div></div>';
+}
+function htmlHistorial(hist){
+  const ult = hist[hist.length - 1], res = ult ? 'Último: ' + fmtFecha(ult.fecha) + ' · ' + (TIPOS_H[ult.tipo] || 'Actualización') : 'Sin movimientos';
+  return '<div class="print-only" style="margin-top:20px;font-weight:700;font-size:1.05rem;">Historial</div>' +
+    '<div class="no-print" style="margin-top:24px;"><button class="acc-b' + (histAbierto ? ' abierto' : '') + '" id="hist-btn" aria-expanded="' + (histAbierto ? 'true' : 'false') + '" onclick="toggleHist()"><span class="acc-t serif">Historial</span><span class="sec-n">' + hist.length + '</span><span class="acc-s">' + esc(res) + '</span><span class="chev"></span></button></div>' +
+    '<div class="acc-cuerpo' + (histAbierto ? '' : ' cerrado') + '" id="hist-cuerpo"><div class="in"><div style="padding-top:10px;">' + hist.map(htmlEntradaComp).join('') + htmlNuevoMov() + '</div></div></div>';
+}
+
+function htmlNuevoMov(){
+  return '<div class="hist-nuevo no-print"><button class="acc-b mini' + (nuevoAbierto ? ' abierto' : '') + '" id="nuevo-btn" aria-expanded="' + (nuevoAbierto ? 'true' : 'false') + '" onclick="toggleNuevo()"><span class="acc-t">＋ Agregar al historial</span><span style="flex:1"></span><span class="chev"></span></button>' +
+    '<div class="acc-cuerpo' + (nuevoAbierto ? '' : ' cerrado') + '" id="nuevo-cuerpo"><div class="in"><div class="nuevo-mov" style="margin-top:6px;">' +
+    '<div class="grid3"><div class="campo"><label class="f-label" for="f-n-fecha">Fecha</label><input type="date" class="input" id="f-n-fecha" value="' + hoyISO() + '"></div>' +
+    '<div class="campo"><label class="f-label" for="f-n-tipo">Tipo</label><select class="input" id="f-n-tipo">' + opcionesTipo(TIPOS_SEL, 'actualizacion') + '</select></div>' +
+    '<div class="campo"><label class="f-label" for="f-n-ref">Referencia (acta o sesión)</label><input class="input" id="f-n-ref" placeholder="Opcional"></div></div>' +
+    '<div class="campo"><label class="f-label" for="f-n-texto">Qué ocurrió o qué se decidió</label><textarea class="input" id="f-n-texto" rows="4" placeholder="Informe, cambio de directiva, decisión del Consejo, seguimiento…"></textarea></div>' +
+    '<p class="error-form" id="f-n-error"></p><div style="text-align:right;"><button class="btn btn-gold" onclick="agregarEntrada()">Agregar al historial</button></div></div></div></div></div>';
+}
+
+// ---------- Informe PDF ----------
+// El PDF se genera en el navegador con jsPDF (se descarga de cdnjs al usarlo por primera vez). No modifica ningún dato.
+const INF_CAMPOS = {
+  tabla:[['estado','Estado',1],['tipo','Tipo',0],['lider','Líder o directiva principal',1],['nInt','Cantidad de integrantes activos',1],['reunion','Día y hora de reunión',1],['lugar','Lugar de reunión',0],['fundacion','Fecha de fundación',0]],
+  fichas:[['proposito','Propósito',1],['fundacion','Fecha de fundación',1],['reunion','Reunión (día, hora y lugar)',1],['directiva','Directiva',1],['integrantes','Integrantes',1],['tel','Teléfonos de las personas',1],['anteriores','Incluir cargos e integrantes anteriores',0],['historial','Historial completo',0]],
+  personas:[['rol','Cargo o función',1],['desde','Fecha de inicio',1],['tel','Teléfono',1],['tipoOrg','Tipo de organización',0],['anteriores','Incluir anteriores (que ya no participan)',0]]
+};
+function abrirInforme(){
+  q('inf-tipos').innerHTML = ORDEN_TIPOS.map(t => { const n = ministerios.filter(m => tipoDe(m) === t).length; return n ? '<label class="inf-chk"><input type="checkbox" data-t="' + t + '" ' + ((filtroTipo === 'todos' || filtroTipo === t) ? 'checked' : '') + ' onchange="infLista()"> ' + TIPOS_PLURAL[t] + ' (' + n + ')</label>' : ''; }).join('');
+  q('inf-error').style.display = 'none'; infCampos(); infLista(); abrirModal('modal-informe');
+}
+function infCampos(){ const f = q('inf-formato').value; q('inf-campos').innerHTML = INF_CAMPOS[f].map(c => '<label class="inf-chk"><input type="checkbox" id="inf-c-' + c[0] + '"' + (c[2] ? ' checked' : '') + '> ' + c[1] + '</label>').join(''); }
+function infOrgs(){
+  const tipos = [...document.querySelectorAll('#inf-tipos input:checked')].map(e => e.dataset.t), est = q('inf-estado').value;
+  return ministerios.filter(m => tipos.includes(tipoDe(m)) && (est === 'todos' || (est === 'activos') === (m.estado === 'activo')))
+    .sort((a, b) => ORDEN_TIPOS.indexOf(tipoDe(a)) - ORDEN_TIPOS.indexOf(tipoDe(b)) || a.nombre.localeCompare(b.nombre, 'es', { numeric:true }));
+}
+function infLista(){
+  const l = infOrgs();
+  q('inf-lista').innerHTML = l.length ? l.map(m => '<label class="inf-chk"><input type="checkbox" data-id="' + m.id + '" checked onchange="infCuenta()"> <span><b>' + esc(m.nombre) + '</b> <span class="muted" style="font-size:.78rem;">' + esc(TIPOS_MIN[tipoDe(m)].label) + ' · ' + (m.estado === 'activo' ? 'activo' : 'inactivo') + '</span></span></label>').join('')
+    : '<p class="muted" style="font-size:.85rem;margin:8px 0;">No hay organizaciones con estos filtros.</p>';
+  infCuenta();
+}
+function infCuenta(){ const t = document.querySelectorAll('#inf-lista input[data-id]').length, s = document.querySelectorAll('#inf-lista input[data-id]:checked').length; q('inf-cuenta').textContent = s + ' de ' + t + ' seleccionadas'; }
+function infMarcar(v){ document.querySelectorAll('#inf-lista input[data-id]').forEach(e => { e.checked = v; }); infCuenta(); }
+function infCargarScript(src){ return new Promise((ok, mal) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => mal(new Error('No se pudo descargar ' + src.split('/').pop() + '. Revisa tu conexión.')); document.head.appendChild(s); }); }
+async function infLibs(){
+  if(!(window.jspdf && window.jspdf.jsPDF)) await infCargarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  if(!(window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API.autoTable)) await infCargarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
+}
+async function generarInforme(modo){
+  const err = q('inf-error'); err.style.display = 'none';
+  const ids = [...document.querySelectorAll('#inf-lista input[data-id]:checked')].map(e => e.dataset.id), sel = infOrgs().filter(m => ids.includes(m.id));
+  if(!sel.length){ err.textContent = 'Elige al menos una organización.'; err.style.display = 'block'; return; }
+  const formato = q('inf-formato').value, campos = {}; INF_CAMPOS[formato].forEach(c => { campos[c[0]] = q('inf-c-' + c[0]).checked; });
+  const tiposSel = [...new Set(sel.map(tipoDe))];
+  const opc = { formato, campos, orient:q('inf-orient').value, agrupar:q('inf-agrupar').checked, resumen:q('inf-resumen').checked, conf:q('inf-conf').checked, firmas:q('inf-firmas').checked,
+    titulo:tiposSel.length === 1 ? 'Informe de ' + TIPOS_PLURAL[tiposSel[0]] : 'Informe de Ministerios y Organizaciones', filtro:q('inf-estado').selectedOptions[0].textContent + '  ·  ' + tiposSel.map(t => TIPOS_PLURAL[t]).join(', ') };
+  const w = modo === 'ver' ? window.open('', '_blank') : null;
+  q('inf-gen').disabled = true;
+  try{
+    await infLibs(); const doc = infCrearPDF(sel, opc);
+    if(w){ w.location.href = doc.output('bloburl'); } else { doc.save('Informe-organizaciones-' + hoyISO() + '.pdf'); toast('PDF descargado'); }
+  }catch(e){ if(w) w.close(); err.textContent = 'No se pudo generar el PDF: ' + (e.message || e); err.style.display = 'block'; }
+  q('inf-gen').disabled = false;
+}
+function infTel(x){ const p = personas.find(p => p.id === x.personaId) || personas.find(p => norm(p.nombre) === norm(x.nombre)); return p && p.telefono ? p.telefono : ''; }
+function infMiembros(m, kind, ant){ return ordenarMiembros(m[kind] || []).filter(x => ant || estadoMiembro(x) !== 'fin'); }
+function infPeriodo(x){ return (x.desde ? fmtFecha(x.desde) : '') + (x.hasta ? (x.desde ? ' a ' : 'Hasta ') + fmtFecha(x.hasta) : (x.desde ? ' (vigente)' : '')); }
+function infLider(m){ const vig = (m.directiva || []).filter(vigente); if(!vig.length) return 'Sin directiva vigente'; const p = vig.find(d => /president|l[ií]der|director|coordinador/i.test(d.rol)) || vig[0]; return p.rol + ': ' + p.nombre + (vig.length > 1 ? ' (+' + (vig.length - 1) + ' más)' : ''); }
+function infCrearPDF(sel, opc){
+  const NAVY = [26,39,68], GOLD = [166,124,43], ROJO = [159,44,44], VERDE = [33,102,63], GRIS = [107,114,128], CLARO = [243,244,246], c = opc.campos;
+  const nCol = opc.formato === 'tabla' ? Object.keys(c).filter(k => c[k]).length + 1 : opc.formato === 'personas' ? Object.keys(c).filter(k => c[k] && k !== 'anteriores').length + 2 : 0;
+  const horizontal = opc.orient === 'l' || (opc.orient === 'auto' && nCol > 5);
+  const doc = new window.jspdf.jsPDF({ orientation:horizontal ? 'l' : 'p', unit:'pt', format:'letter' });
+  const pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight(), M = 40;
+  const nAct = sel.filter(m => m.estado === 'activo').length, personasSet = new Set();
+  sel.forEach(m => infMiembros(m, 'directiva', false).concat(infMiembros(m, 'integrantes', false)).forEach(x => personasSet.add(norm(x.nombre))));
+  doc.setFont('times', 'bold'); doc.setFontSize(21); doc.setTextColor(...NAVY); doc.text(opc.titulo, M, 52);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
+  doc.text('Iglesia Evangélica Centroamericana "Salem"  ·  Consejo Local, Patzún, Chimaltenango', M, 68);
+  doc.text('Generado el ' + new Date().toLocaleDateString('es-GT', { weekday:'long', day:'2-digit', month:'long', year:'numeric' }), M, 80);
+  doc.setDrawColor(...GOLD); doc.setLineWidth(1.2); doc.line(M, 90, pw - M, 90);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...NAVY); doc.text(doc.splitTextToSize(opc.filtro, pw - 2 * M), M, 106);
+  let y = 122;
+  if(opc.resumen){
+    const tiles = [[sel.length, 'Organizaciones'], [nAct, 'Activas'], [sel.length - nAct, 'Inactivas'], [personasSet.size, 'Personas con cargo o participación']], gap = 10, w = (pw - 2 * M - 3 * gap) / 4;
+    tiles.forEach((t, i) => { const x = M + i * (w + gap); doc.setDrawColor(209,213,219); doc.setLineWidth(.6); doc.roundedRect(x, y, w, 46, 6, 6);
+      doc.setFont('times', 'bold'); doc.setFontSize(19); doc.setTextColor(...NAVY); doc.text(String(t[0]), x + w / 2, y + 22, { align:'center' });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...GRIS); doc.text(t[1].toUpperCase(), x + w / 2, y + 37, { align:'center', maxWidth:w - 8 }); });
+    y += 64;
+  }
+  const base = { margin:{ top:44, left:M, right:M, bottom:48 }, didDrawPage:d => { if(d.pageNumber > 1){ doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...GRIS); doc.text(opc.titulo + '  ·  Consejo Local', M, 26); } } };
+  const estilo = { font:'helvetica', fontSize:8.5, cellPadding:5, lineColor:[229,231,235], lineWidth:.5, textColor:[31,41,55], overflow:'linebreak' };
+  const grupos = opc.agrupar ? ORDEN_TIPOS.map(t => [t, sel.filter(m => tipoDe(m) === t)]).filter(g => g[1].length) : [['', sel]];
+  const estCelda = d => { if(d.section === 'body' && (d.cell.raw === 'Activo' || d.cell.raw === 'Inactivo')){ d.cell.styles.fontStyle = 'bold'; d.cell.styles.textColor = d.cell.raw === 'Activo' ? VERDE : ROJO; } };
+  const bandaTipo = (t, n) => ({ content:TIPOS_PLURAL[t] + ' (' + n + ')', colSpan:nCol || 2, styles:{ fillColor:CLARO, fontStyle:'bold', textColor:NAVY, fontSize:9.5 } });
+  if(opc.formato === 'tabla'){
+    const cols = INF_CAMPOS.tabla.filter(k => c[k[0]]), body = [];
+    const fila = m => [m.nombre].concat(cols.map(k => ({ estado:m.estado === 'activo' ? 'Activo' : 'Inactivo', tipo:TIPOS_MIN[tipoDe(m)].label, lider:infLider(m), nInt:String((m.integrantes || []).filter(vigente).length), reunion:[m.reunionDia, m.reunionHora ? fmtHora(m.reunionHora) : ''].filter(Boolean).join(', ') || 'Sin definir', lugar:m.reunionLugar || '', fundacion:m.fechaFundacion ? fmtFecha(m.fechaFundacion) : '' }[k[0]])));
+    grupos.forEach(([t, l]) => { if(opc.agrupar) body.push([bandaTipo(t, l.length)]); l.forEach(m => body.push(fila(m))); });
+    doc.autoTable({ ...base, startY:y, head:[['Nombre'].concat(cols.map(k => k[1]))], body, theme:'grid', styles:estilo, headStyles:{ fillColor:NAVY, textColor:255, fontStyle:'bold', lineColor:NAVY }, columnStyles:{ 0:{ fontStyle:'bold' } }, rowPageBreak:'avoid', didParseCell:estCelda });
+    y = doc.lastAutoTable.finalY;
+  }else if(opc.formato === 'personas'){
+    const body = [], colsOp = [['rol', 'Cargo o función'], ['desde', 'Período'], ['tel', 'Teléfono'], ['tipoOrg', 'Tipo']].filter(k => c[k[0]]);
+    grupos.forEach(([t, l]) => { if(opc.agrupar) body.push([bandaTipo(t, l.length)]);
+      l.forEach(m => { body.push([{ content:m.nombre + '   (' + (m.estado === 'activo' ? 'Activo' : 'Inactivo') + ')', colSpan:nCol, styles:{ fillColor:[250,250,251], fontStyle:'bold', textColor:NAVY } }]);
+        const ps = infMiembros(m, 'directiva', c.anteriores).map(x => [x, 'Directiva']).concat(infMiembros(m, 'integrantes', c.anteriores).map(x => [x, 'Integrante']));
+        if(!ps.length) body.push([{ content:'Sin personas registradas.', colSpan:nCol, styles:{ textColor:GRIS, fontStyle:'italic' } }]);
+        ps.forEach(([x, k]) => body.push([x.nombre].concat(colsOp.map(o => ({ rol:(x.rol || '') + (k === 'Directiva' ? ' (directiva)' : ''), desde:infPeriodo(x), tel:infTel(x), tipoOrg:TIPOS_MIN[tipoDe(m)].label }[o[0]]))))); }); });
+    doc.autoTable({ ...base, startY:y, head:[['Nombre'].concat(colsOp.map(o => o[1]))], body, theme:'grid', styles:estilo, headStyles:{ fillColor:NAVY, textColor:255, fontStyle:'bold', lineColor:NAVY }, columnStyles:{ 0:{ fontStyle:'bold' } }, rowPageBreak:'avoid' });
+    y = doc.lastAutoTable.finalY;
+  }else{
+    let primera = true;
+    grupos.forEach(([t, l]) => {
+      if(opc.agrupar){ if(!primera && y > ph - 120){ doc.addPage(); y = 44; } else if(!primera) y += 18; doc.setFont('times', 'bold'); doc.setFontSize(14); doc.setTextColor(...NAVY); doc.text(TIPOS_PLURAL[t] + ' (' + l.length + ')', M, y + 12); doc.setDrawColor(...GOLD); doc.setLineWidth(.8); doc.line(M, y + 18, pw - M, y + 18); y += 28; }
+      l.forEach(m => {
+        if(y > ph - 150){ doc.addPage(); y = 44; } else if(!primera || opc.agrupar) y += 8; primera = false;
+        const filas = [[{ content:m.nombre + '   (' + (m.estado === 'activo' ? 'Activo' : 'Inactivo' + (m.fechaEstado ? ' desde ' + fmtFecha(m.fechaEstado) : '')) + ')', colSpan:2, styles:{ fillColor:NAVY, textColor:255, fontStyle:'bold', fontSize:10.5, cellPadding:7 } }]];
+        if(!opc.agrupar) filas.push(['Tipo', TIPOS_MIN[tipoDe(m)].label]);
+        if(c.proposito && m.proposito) filas.push(['Propósito', m.proposito]); if(c.fundacion && m.fechaFundacion) filas.push(['Fundación', fmtFecha(m.fechaFundacion)]); if(c.reunion) filas.push(['Reunión', reunionTexto(m)]);
+        doc.autoTable({ ...base, startY:y, body:filas, theme:'plain', styles:{ ...estilo, fontSize:9, lineWidth:{ bottom:.5 } }, columnStyles:{ 0:{ cellWidth:110, fontStyle:'bold', textColor:GRIS } }, rowPageBreak:'avoid' }); y = doc.lastAutoTable.finalY;
+        const sub = (titulo, head, body) => { doc.autoTable({ ...base, startY:y + 6, head:[[{ content:titulo, colSpan:head.length, styles:{ fillColor:CLARO, textColor:NAVY, fontStyle:'bold' } }], head], body, theme:'grid', styles:{ ...estilo, fontSize:8.5 }, headStyles:{ fillColor:[250,250,251], textColor:GRIS, fontStyle:'bold' }, rowPageBreak:'avoid' }); y = doc.lastAutoTable.finalY; };
+        const headP = (a, b) => [a, b].concat(c.tel ? ['Teléfono'] : []).concat(['Período']), filaP = x => [x.nombre, x.rol || ''].concat(c.tel ? [infTel(x)] : []).concat([infPeriodo(x)]);
+        if(c.directiva){ const d = infMiembros(m, 'directiva', c.anteriores); sub('Directiva', headP('Nombre', 'Cargo'), d.length ? d.map(filaP) : [[{ content:'Sin cargos registrados.', colSpan:headP('', '').length, styles:{ textColor:GRIS, fontStyle:'italic' } }]]); }
+        if(c.integrantes){ const d = infMiembros(m, 'integrantes', c.anteriores); sub('Integrantes (' + d.length + ')', headP('Nombre', 'Función'), d.length ? d.map(filaP) : [[{ content:'Sin integrantes registrados.', colSpan:headP('', '').length, styles:{ textColor:GRIS, fontStyle:'italic' } }]]); }
+        if(c.historial){ const h = (m.historial || []).slice().sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '')); sub('Historial (' + h.length + ')', ['Fecha', 'Tipo', 'Detalle'], h.length ? h.map(e => [fmtFecha(e.fecha), TIPOS_H[e.tipo] || 'Actualización', (e.texto || '') + (e.referencia ? '\nReferencia: ' + e.referencia : '')]) : [[{ content:'Sin movimientos.', colSpan:3, styles:{ textColor:GRIS, fontStyle:'italic' } }]]); }
+      });
+    });
+  }
+  if(opc.firmas){
+    y += 64; if(y > ph - 90){ doc.addPage(); y = 90; }
+    doc.setDrawColor(31,41,55); doc.setLineWidth(.6); const lw = (pw - 2 * M) * .38; doc.line(M, y, M + lw, y); doc.line(pw - M - lw, y, pw - M, y);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(75,85,99); doc.text('Secretario(a)', M + lw / 2, y + 14, { align:'center' }); doc.text('Mesa Directiva', pw - M - lw / 2, y + 14, { align:'center' });
+  }
+  const n = doc.internal.getNumberOfPages();
+  for(let i = 1; i <= n; i++){ doc.setPage(i); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...GRIS);
+    doc.text(opc.conf ? 'Documento confidencial del Consejo Local. Uso reservado.' : 'Consejo Local, Iglesia Salem', M, ph - 26); doc.text('Página ' + i + ' de ' + n, pw - M, ph - 26, { align:'right' }); }
+  return doc;
+}
+
+// ---------- Escritura ----------
+async function actualizarMin(id, datos){
+  try{ await db.collection('ministerios').doc(id).update({ ...datos, actualizado:Date.now() }); return true; }
+  catch(e){ errorFirestore(e); toast('No se pudo guardar. Revisa el aviso en pantalla.', true); return false; }
+}
+function nuevaEntrada(tipo, fecha, texto, ref){ return { id:uid(), tipo, fecha, texto, referencia:ref||'', creado:Date.now(), editado:null, autor:autorActual() }; }
+async function asegurarPersona(nombre){
+  const n = norm(nombre), ex = personas.find(p => norm(p.nombre)===n);
+  if(ex) return ex.id;
+  const ref = await db.collection('personas').add({ nombre:nombre.trim().replace(/\s+/g,' '), creado:Date.now() });
+  return ref.id;
+}
+async function agregarEntrada(){
+  const mi = minActual(); if(!mi) return;
+  const fecha = q('f-n-fecha').value, tipo = q('f-n-tipo').value, ref = q('f-n-ref').value.trim(), texto = q('f-n-texto').value.trim(), err = q('f-n-error');
+  err.style.display = 'none';
+  if(!fecha || !texto){ err.textContent = 'Indica la fecha y escribe el texto del movimiento.'; err.style.display = 'block'; return; }
+  if(await actualizarMin(mi.id, { historial:[...(mi.historial||[]), nuevaEntrada(tipo, fecha, texto, ref)] })){
+    ['f-n-texto','f-n-ref'].forEach(i => { q(i).value = ''; }); toast('Agregado al historial');
+  }
+}
+function editarEntrada(id){ entradaEditando = id; renderDetalle(true); }
+async function guardarEntrada(id){
+  const mi = minActual(); if(!mi) return;
+  const fecha = q('f-e-fecha').value, texto = q('f-e-texto').value.trim(), ref = q('f-e-ref').value.trim();
+  if(!fecha || !texto){ toast('La fecha y el texto no pueden quedar vacíos', true); return; }
+  const historial = (mi.historial||[]).map(h => {
+    if(h.id !== id) return h;
+    const tSel = q('f-e-tipo'), tipo = (tSel && tSel.tagName==='SELECT') ? tSel.value : h.tipo;
+    return { ...h, fecha, texto, referencia:ref, tipo, editado:Date.now(), editadoPor:autorActual() };
+  });
+  if(await actualizarMin(mi.id, { historial })){ entradaEditando = null; renderDetalle(true); toast('Cambios guardados'); }
+}
+async function eliminarEntrada(id){
+  const mi = minActual(); if(!mi) return;
+  if(!confirm('¿Eliminar este movimiento del historial? No se puede deshacer.')) return;
+  if(await actualizarMin(mi.id, { historial:(mi.historial||[]).filter(h => h.id!==id) })) toast('Movimiento eliminado');
+}
+
+// Activar / inactivar
+function abrirEstado(){
+  const mi = minActual(); if(!mi) return;
+  estadoAccion = mi.estado==='activo' ? 'inactivar' : 'reactivar';
+  q('me-titulo').textContent = estadoAccion==='inactivar' ? 'Marcar como inactivo' : 'Reactivar ministerio o grupo';
+  q('me-fecha').value = hoyISO(); q('me-texto').value = ''; q('me-ref').value = ''; q('me-error').style.display = 'none';
+  abrirModal('modal-estado');
+}
+async function confirmarEstado(){
+  const mi = minActual(); if(!mi) return;
+  const fecha = q('me-fecha').value, texto = q('me-texto').value.trim(), ref = q('me-ref').value.trim();
+  if(!fecha){ q('me-error').textContent = 'Indica la fecha.'; q('me-error').style.display = 'block'; return; }
+  const ina = estadoAccion==='inactivar';
+  const entrada = nuevaEntrada('estado', fecha, texto || (ina ? 'Marcado como inactivo.' : 'Reactivado.'), ref);
+  if(await actualizarMin(mi.id, { estado:ina?'inactivo':'activo', fechaEstado:fecha, historial:[...(mi.historial||[]), entrada] })){ cerrarModal('modal-estado'); toast(ina ? 'Marcado como inactivo' : 'Reactivado'); }
+}
+async function eliminarMin(){
+  const mi = minActual(); if(!mi) return;
+  const r = prompt('Esto elimina el ministerio o grupo con su directiva, integrantes e historial, y no se puede deshacer.\n\nPara confirmar, escribe el nombre exacto:\n' + mi.nombre);
+  if(r === null) return;
+  if(norm(r) !== norm(mi.nombre)){ toast('El nombre no coincide. No se eliminó nada.', true); return; }
+  try{ await db.collection('ministerios').doc(mi.id).delete(); volverLista(); toast('Eliminado'); }
+  catch(e){ errorFirestore(e); toast('No se pudo eliminar', true); }
+}
+
+// ---------- Formulario de ministerio ----------
+function abrirModalMin(id){
+  const mi = id ? ministerios.find(x => x.id===id) : null;
+  modoMin = mi ? 'editar' : 'nuevo'; minEditId = id || null;
+  q('mm-titulo').textContent = mi ? 'Editar datos' : 'Nuevo ministerio o grupo';
+  q('mm-nombre').value = mi ? mi.nombre : ''; q('mm-tipo').value = mi ? (mi.tipo||'ministerio') : (filtroTipo !== 'todos' ? filtroTipo : 'ministerio');
+  q('mm-proposito').value = mi ? (mi.proposito||'') : ''; q('mm-fundacion').value = mi ? (mi.fechaFundacion||'') : '';
+  q('mm-lugar').value = mi ? (mi.reunionLugar||'') : ''; q('mm-dia').value = mi ? (mi.reunionDia||'') : ''; q('mm-hora').value = mi ? (mi.reunionHora||'') : '';
+  q('mm-obs').value = ''; q('mm-bloque-obs').style.display = mi ? 'none' : 'block';
+  q('mm-error').style.display = 'none'; q('mm-guardar').disabled = false;
+  abrirModal('modal-min'); setTimeout(() => q('mm-nombre').focus(), 50);
+}
+async function guardarMinisterio(){
+  const nombre = q('mm-nombre').value.trim().replace(/\s+/g,' '), err = q('mm-error');
+  const fallo = m => { err.textContent = m; err.style.display = 'block'; };
+  err.style.display = 'none';
+  if(!nombre) return fallo('Escribe el nombre.');
+  if(ministerios.some(m => m.id!==minEditId && norm(m.nombre)===norm(nombre))) return fallo('Ya existe un ministerio o grupo con ese nombre.');
+  const base = { nombre, tipo:q('mm-tipo').value, proposito:q('mm-proposito').value.trim(), fechaFundacion:q('mm-fundacion').value || null,
+    reunionDia:q('mm-dia').value, reunionHora:q('mm-hora').value || null, reunionLugar:q('mm-lugar').value.trim(), actualizado:Date.now() };
+  q('mm-guardar').disabled = true;
+  try{
+    if(modoMin==='nuevo'){
+      await db.collection('ministerios').add({ ...base, estado:'activo', fechaEstado:null, directiva:[], integrantes:[], creado:Date.now(), creadoPor:autorActual(),
+        historial:[nuevaEntrada('creacion', hoyISO(), q('mm-obs').value.trim() || 'Registrado en el sistema.', '')] });
+      toast('Registrado');
+    }else{
+      await db.collection('ministerios').doc(minEditId).update(base); toast('Datos actualizados');
+    }
+    cerrarModal('modal-min');
+  }catch(e){ errorFirestore(e); fallo('No se pudo guardar. Revisa el aviso en pantalla.'); }
+  q('mm-guardar').disabled = false;
+}
+
+// ---------- Directiva e integrantes: formulario ----------
+function abrirMiembro(kind, id){
+  const mi = minActual(); if(!mi) return;
+  const m = id ? (mi[kind]||[]).find(x => x.id===id) : null;
+  miembroKind = kind; miembroEditId = id || null;
+  const dir = kind==='directiva';
+  q('mb-titulo').textContent = (m ? 'Editar ' : 'Agregar ') + (dir ? 'cargo' : 'integrante');
+  q('mb-rol-l').textContent = dir ? 'Cargo' : 'Función';
+  q('mb-desde-l').textContent = dir ? 'Inicio del período' : 'Fecha de ingreso (opcional)';
+  q('mb-hasta-l').textContent = dir ? 'Fin del período (opcional)' : 'Fecha de salida (opcional)';
+  q('mb-ayuda').style.display = dir ? 'block' : 'none';
+  q('mb-nombre').value = m ? m.nombre : ''; q('mb-rol').value = m ? m.rol : (dir ? '' : 'Integrante');
+  q('mb-desde').value = m ? (m.desde||'') : (dir ? hoyISO() : ''); q('mb-hasta').value = m ? (m.hasta||'') : '';
+  q('mb-error').style.display = 'none'; q('mb-guardar').disabled = false;
+  abrirModal('modal-miembro'); setTimeout(() => q('mb-nombre').focus(), 50);
+}
+async function guardarMiembro(){
+  const mi = minActual(); if(!mi) return;
+  const nombre = q('mb-nombre').value.trim().replace(/\s+/g,' '), rol = q('mb-rol').value.trim(), desde = q('mb-desde').value || null, hasta = q('mb-hasta').value || null, err = q('mb-error');
+  const fallo = m => { err.textContent = m; err.style.display = 'block'; };
+  err.style.display = 'none';
+  if(!nombre || !rol) return fallo('Escribe el nombre y ' + (miembroKind==='directiva' ? 'el cargo.' : 'la función.'));
+  if(desde && hasta && hasta < desde) return fallo('La fecha final no puede ser anterior a la inicial.');
+  q('mb-guardar').disabled = true;
+  try{
+    const personaId = await asegurarPersona(nombre);
+    const arr = [...(mi[miembroKind]||[])], extra = {};
+    if(miembroEditId) { const i = arr.findIndex(x => x.id===miembroEditId); arr[i] = { ...arr[i], personaId, nombre, rol, desde, hasta }; }
+    else{
+      arr.push({ id:uid(), personaId, nombre, rol, desde, hasta });
+      if(miembroKind==='directiva') extra.historial = [...(mi.historial||[]), nuevaEntrada('directiva', desde || hoyISO(), 'Se registró a ' + nombre + ' como ' + rol + (desde ? ' desde el ' + fmtFecha(desde) : '') + (hasta ? ' hasta el ' + fmtFecha(hasta) : '') + '.', '')];
+    }
+    if(await actualizarMin(mi.id, { [miembroKind]:arr, ...extra })){ cerrarModal('modal-miembro'); toast('Guardado'); }
+  }catch(e){ errorFirestore(e); fallo('No se pudo guardar. Revisa el aviso en pantalla.'); }
+  q('mb-guardar').disabled = false;
+}
+async function quitarMiembro(kind, id){
+  const mi = minActual(); if(!mi) return;
+  const m = (mi[kind]||[]).find(x => x.id===id); if(!m) return;
+  if(!confirm('¿Quitar a ' + m.nombre + ' (' + m.rol + ') de ' + (kind==='directiva' ? 'la directiva' : 'los integrantes') + '?\nSi solo terminó su participación, es mejor editarlo y poner la fecha de fin.')) return;
+  const extra = kind==='directiva' ? { historial:[...(mi.historial||[]), nuevaEntrada('directiva', hoyISO(), 'Se quitó el registro de ' + m.nombre + ' como ' + m.rol + '.', '')] } : {};
+  if(await actualizarMin(mi.id, { [kind]:(mi[kind]||[]).filter(x => x.id!==id), ...extra })) toast('Quitado');
+}
+
+// ---------- Ajustes ----------
+function abrirAjustes(){ tabAjustes('personas'); renderPersonas(); q('aj-proyecto').textContent = firebaseConfig ? firebaseConfig.projectId : ''; abrirModal('modal-ajustes'); }
+function tabAjustes(t){
+  document.querySelectorAll('#modal-ajustes .tab-mini').forEach(el => el.classList.toggle('active', el.dataset.tab===t));
+  q('aj-personas').style.display = t==='personas' ? 'block' : 'none';
+  q('aj-conexion').style.display = t==='conexion' ? 'block' : 'none';
+}
+function usosPersona(id){
+  const enMin = ministerios.reduce((s,m) => s + (m.directiva||[]).concat(m.integrantes||[]).filter(x => x.personaId===id).length, 0);
+  return enMin + disc.filter(c => c.personaId===id).length;
+}
+function renderPersonas(){
+  const ps = [...personas].sort((a,b) => a.nombre.localeCompare(b.nombre,'es'));
+  q('aj-personas-lista').innerHTML = ps.length ? ps.map(p => {
+    const n = usosPersona(p.id);
+    return '<div class="fila-persona"><span>' + esc(p.nombre) + '</span><span class="cnt">' + pl(n,'registro','registros') + '</span>' + (n ? '' : '<button class="btn btn-ghost btn-sm" onclick="borrarPersona(\'' + p.id + '\')">Quitar</button>') + '</div>';
+  }).join('') : '<p class="muted" style="font-size:.85rem;">Aún no hay personas registradas.</p>';
+}
+async function agregarPersonaManual(){
+  const n = q('aj-persona-nueva').value.trim(); if(!n) return;
+  try{ await asegurarPersona(n); q('aj-persona-nueva').value = ''; }catch(e){ errorFirestore(e); }
+}
+async function borrarPersona(id){
+  if(!confirm('¿Quitar a esta persona de la lista?')) return;
+  try{ await db.collection('personas').doc(id).delete(); }catch(e){ errorFirestore(e); }
+}
+
+// ---------- Exportar ----------
+function descargar(nombre, contenido, tipo){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([contenido], { type:tipo })); a.download = nombre;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function exportarCSV(){
+  const cols = ['Nombre','Tipo','Estado','Directiva vigente','Reunión','Integrantes activos'];
+  const cel = v => '"' + String(v==null?'':v).replace(/"/g,'""') + '"';
+  const filas = listaFiltrada().map(m => [m.nombre, (TIPOS_MIN[m.tipo]||{}).label||'', m.estado, (m.directiva||[]).filter(vigente).map(d => d.rol + ': ' + d.nombre).join(' | '), reunionTexto(m), (m.integrantes||[]).filter(vigente).length].map(cel).join(','));
+  descargar('ministerios-' + hoyISO() + '.csv', '\ufeff' + [cols.map(cel).join(','), ...filas].join('\r\n'), 'text/csv;charset=utf-8');
+}
+function exportarRespaldo(){
+  descargar('respaldo-ministerios-' + hoyISO() + '.json', JSON.stringify({ exportado:new Date().toISOString(), exportadoPor:autorActual(), personas, ministerios }, null, 2), 'application/json');
+  toast('Respaldo descargado. Guárdalo en un lugar seguro.');
+}
+document.addEventListener('keydown', e => { if(e.key==='Escape') document.querySelectorAll('.modal-backdrop').forEach(m => { m.style.display = 'none'; }); });
+
+function errorFirestore(e){
+  console.error(e);
+  const b = q('banner-error');
+  if(e && e.code === 'permission-denied'){
+    b.innerHTML = '<b>Firestore rechazó el acceso.</b> Verifica que tu correo esté en la lista de autorizados de las reglas de Firestore para las colecciones <b>ministerios</b> y <b>personas</b>.';
+  }else{
+    b.textContent = 'Error de conexión con Firestore: ' + (e && e.message ? e.message : e);
+  }
+  b.style.display = 'block';
+}
+
+function msgAuth(e){
+  const m = { 'auth/invalid-credential':'Correo o contraseña incorrectos.', 'auth/wrong-password':'Correo o contraseña incorrectos.', 'auth/user-not-found':'Correo o contraseña incorrectos.',
+    'auth/invalid-email':'El correo no tiene un formato válido.', 'auth/too-many-requests':'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
+    'auth/network-request-failed':'Sin conexión con Firebase. Revisa tu internet.', 'auth/operation-not-allowed':'El inicio de sesión con correo no está habilitado en Firebase (Authentication → Sign-in method).',
+    'auth/user-disabled':'Esta cuenta está deshabilitada.' };
+  return m[e.code] || ('No se pudo iniciar sesión: ' + (e.message || e));
+}
+async function iniciarSesion(){
+  const correo = q('lg-correo').value.trim(), clave = q('lg-clave').value, err = q('lg-error');
+  err.style.display = 'none'; q('login-aviso').textContent = '';
+  if(!correo || !clave){ err.textContent = 'Escribe tu correo y contraseña.'; err.style.display = 'block'; return; }
+  q('lg-btn').disabled = true;
+  try{ await auth.signInWithEmailAndPassword(correo, clave); q('lg-clave').value = ''; }
+  catch(e){ err.textContent = msgAuth(e); err.style.display = 'block'; }
+  q('lg-btn').disabled = false;
+}
+async function recuperarClave(){
+  const correo = q('lg-correo').value.trim(), err = q('lg-error');
+  err.style.display = 'none';
+  if(!correo){ err.textContent = 'Escribe tu correo arriba y vuelve a presionar “Olvidé mi contraseña”.'; err.style.display = 'block'; return; }
+  try{ await auth.sendPasswordResetEmail(correo); q('login-aviso').textContent = 'Si el correo está registrado, te enviamos un enlace para crear una nueva contraseña.'; }
+  catch(e){ err.textContent = msgAuth(e); err.style.display = 'block'; }
+}
+function cerrarSesion(){ auth.signOut(); }
+function reiniciarInactividad(){
+  clearTimeout(inactTimer);
+  if(!usuario) return;
+  inactTimer = setTimeout(() => { q('login-aviso').textContent = 'La sesión se cerró por inactividad (30 minutos).'; auth.signOut(); }, LIMITE_INACTIVIDAD);
+}
+['click','keydown','touchstart','scroll'].forEach(ev => document.addEventListener(ev, reiniciarInactividad, { passive:true }));
+
+function listaRoles(){ return [].concat(CARGOS_BASE, ['Integrante'], ...ministerios.map(x => (x.directiva||[]).concat(x.integrantes||[]).map(y => y.rol))); }
+activarSugerencias('mb-nombre', () => personas.map(p => p.nombre), 2);
+activarSugerencias('mb-rol', listaRoles, 1);
+activarSugerencias('mm-lugar', () => ministerios.map(x => x.reunionLugar), 2);
+
+(async function start(){
+  // El inicio de sesión de Firebase solo funciona en páginas http(s), no en archivos descargados (file:// o content://).
+  if(location.protocol !== 'http:' && location.protocol !== 'https:'){
+    q('setup-screen').style.display = 'flex';
+    q('setup-error').innerHTML = '<b>Este módulo no puede abrirse como archivo descargado.</b> El inicio de sesión necesita una dirección <b>https://</b>. Publícalo en GitHub Pages (junto a tus otros sistemas) y ábrelo desde esa dirección.';
+    return;
+  }
+  const listo = await asegurarFirebaseCargado();
+  if(!listo){
+    q('setup-screen').style.display = 'flex';
+    q('setup-error').innerHTML = 'No se pudo cargar Firebase desde internet. Casi siempre es un <b>bloqueador de anuncios o extensión</b>, o una <b>red que bloquea gstatic.com y jsdelivr.net</b>. Desactívalo para esta página y recarga.';
+    return;
+  }
+  try{
+    inicializarFirebase(cargarConfigGuardada() || EMBEDDED_FIREBASE_CONFIG);
+    try{ await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); }catch(e){} // la sesión termina al cerrar la pestaña
+    let authListo = false;
+    const guardia = setTimeout(() => {
+      if(authListo) return;
+      q('setup-screen').style.display = 'flex';
+      q('setup-error').innerHTML = '<b>No se pudo verificar la sesión.</b> Abre el módulo desde su dirección https y confirma que el navegador permita almacenamiento y cookies para el sitio.';
+    }, 10000);
+    auth.onAuthStateChanged(user => {
+      authListo = true; clearTimeout(guardia); q('setup-screen').style.display = 'none';
+      if(user){
+        usuario = user; q('usuario-email').textContent = user.email; SalemUI.usuario(user.email);
+        q('login-screen').style.display = 'none'; q('app').style.display = 'block';
+        SalemUI.entrada(); iniciarApp(); reiniciarInactividad();
+      }else{
+        usuario = null; clearTimeout(inactTimer); detenerApp();
+        q('app').style.display = 'none'; q('login-screen').style.display = 'flex';
+      }
+    });
+  }catch(e){
+    q('setup-screen').style.display = 'flex';
+    q('setup-error').textContent = 'No se pudo conectar: ' + e.message;
+  }
+})();
+</script>
+</body>
+</html>
